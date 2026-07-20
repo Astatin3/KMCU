@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::env::args;
 
 use serialport::SerialPort;
@@ -27,8 +29,12 @@ fn main() -> anyhow::Result<()> {
         .nth(1)
         .ok_or(anyhow::anyhow!("Must specify device!"))?;
 
+    let buad = args().nth(2).ok_or(anyhow::anyhow!("Must specify buad!"))?;
+
+    let buad = u32::from_str_radix(&buad, 10)?;
+
     println!("Opening port...");
-    let con = Connection::open(&device)?;
+    let con = Connection::open(&device, buad)?;
 
     Ok(())
 }
@@ -41,12 +47,12 @@ struct Connection {
 impl Connection {
     const IDENTIFY_COUNT: usize = 40;
 
-    pub fn open(path: &str) -> anyhow::Result<Self> {
-        println!("Opening port {path}...");
+    pub fn open(path: &str, buad: u32) -> anyhow::Result<Self> {
+        println!("Opening port {path} at {buad} buad...");
 
         let mut this = Self {
-            port: serialport::new(path, 1000000)
-                .timeout(std::time::Duration::from_millis(1000))
+            port: serialport::new(path, buad)
+                .timeout(std::time::Duration::from_millis(100))
                 .open()?,
             seq: 0,
         };
@@ -69,25 +75,59 @@ impl Connection {
             ],
         };
 
-        let identify = CommandFilled(
-            1,
-            vec![CommandArgFilled::uint32(0), CommandArgFilled::byte(40)],
-        );
+        let mut i = 0;
 
-        let payload = identify.encode();
+        loop {
+            let byte_start = i * Self::IDENTIFY_COUNT;
 
-        let message = Message::new(payload, 0).unwrap().encode();
+            let command = CommandFilled(
+                1,
+                vec![
+                    CommandArgFilled::uint32(byte_start as u32),
+                    CommandArgFilled::byte(Self::IDENTIFY_COUNT as u8),
+                ],
+            );
 
-        println!("Wrote identify command: {message:?}");
-        self.port.write_all(&message)?;
+            self.write(&command);
 
-        // Read data
-        let mut buffer = [0; 20];
-        let bytes_read = self.port.read(&mut buffer)?;
+            let response = self.read()?;
 
-        println!("Buffer: {buffer:?}");
+            if response.payload.len() == 0 {
+                println!("Empty packet, resending...");
+            } else {
+                println!("Response: {response:?}");
+                i += 1;
+            }
+
+            if i > 100 {
+                break;
+            }
+        }
 
         Ok(())
+    }
+
+    fn write(&mut self, command: &CommandFilled) -> anyhow::Result<()> {
+        let payload = command.encode();
+
+        let message = Message::new(payload, (self.seq % 16) as u8).unwrap();
+
+        // println!("Sent: {message:?}");
+
+        self.port.write_all(&message.encode())?;
+
+        // self.seq += 1;
+
+        Ok(())
+    }
+
+    fn read(&mut self) -> anyhow::Result<Message> {
+        let message = Message::decode(&mut self.port, ())?;
+
+        // be sure to increment the sequence number
+        self.seq = message.sequence as usize;
+
+        Ok(message)
     }
 
     pub fn run() {}

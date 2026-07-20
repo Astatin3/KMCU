@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use crate::traits::binary::Binary;
 
 // MessageTypes = {
@@ -23,7 +25,7 @@ impl Binary for CommandFilled {
         vec![crate::vlq::encode_msgid(self.0), self.1.encode()].encode()
     }
 
-    fn decode(_: &[u8], outline: CommandOutline) -> anyhow::Result<Self> {
+    fn decode(_: &mut dyn Read, _outline: CommandOutline) -> anyhow::Result<Self> {
         unreachable!()
     }
 }
@@ -74,11 +76,11 @@ impl Binary for CommandArgFilled {
 
     fn encode(&self) -> Vec<u8> {
         match self {
-            CommandArgFilled::uint32(n) => n.to_le_bytes().to_vec(),
-            CommandArgFilled::int32(n) => n.to_le_bytes().to_vec(),
-            CommandArgFilled::uint16(n) => n.to_le_bytes().to_vec(),
-            CommandArgFilled::int16(n) => n.to_le_bytes().to_vec(),
-            CommandArgFilled::byte(n) => n.to_le_bytes().to_vec(),
+            CommandArgFilled::uint32(n) => crate::vlq::encode_int(*n as u32),
+            CommandArgFilled::int32(n) => crate::vlq::encode_int(*n as u32),
+            CommandArgFilled::uint16(n) => crate::vlq::encode_int(*n as u32),
+            CommandArgFilled::int16(n) => crate::vlq::encode_int(*n as u32),
+            CommandArgFilled::byte(n) => crate::vlq::encode_int(*n as u32),
             CommandArgFilled::string(str) => vec![
                 crate::vlq::encode_int(str.len() as u32),
                 str.clone().into_bytes(),
@@ -93,7 +95,7 @@ impl Binary for CommandArgFilled {
         }
     }
 
-    fn decode(_: &[u8], outline: CommandArgOutline) -> anyhow::Result<Self> {
+    fn decode(_: &mut dyn Read, _outline: CommandArgOutline) -> anyhow::Result<Self> {
         unreachable!()
     }
 }

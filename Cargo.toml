@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.104"
+gpio = "0.4.1"
 serialport = "4.9.0"

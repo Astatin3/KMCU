@@ -1,13 +1,10 @@
+use std::io::Read;
+
 pub trait Binary: Sized {
     type DecodeArg;
 
     fn encode(&self) -> Vec<u8>;
-    fn decode(buf: &[u8], arg: Self::DecodeArg) -> anyhow::Result<Self>;
-}
-
-fn slice_to_array<const N: usize>(slice: &[u8]) -> Result<[u8; N], std::array::TryFromSliceError> {
-    // Performs a runtime size check and copies the data
-    slice.try_into()
+    fn decode(reader: &mut dyn Read, arg: Self::DecodeArg) -> anyhow::Result<Self>;
 }
 
 macro_rules! binary_num {
@@ -19,8 +16,10 @@ macro_rules! binary_num {
                 self.to_le_bytes().to_vec()
             }
 
-            fn decode(buf: &[u8], _: ()) -> anyhow::Result<Self> {
-                Ok($t::from_le_bytes(slice_to_array(buf)?))
+            fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
+                let mut buf = [0u8; std::mem::size_of::<$t>()];
+                reader.read_exact(&mut buf)?;
+                Ok($t::from_le_bytes(buf))
             }
         }
     };
@@ -41,7 +40,7 @@ impl<T: Binary> Binary for Vec<T> {
         self.into_iter().map(|a| a.encode()).flatten().collect()
     }
 
-    fn decode(_: &[u8], _: ()) -> anyhow::Result<Self> {
+    fn decode(_: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
         unreachable!()
     }
 }

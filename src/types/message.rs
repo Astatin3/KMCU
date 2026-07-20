@@ -1,13 +1,16 @@
+use std::io::Read;
+
 use crate::traits::binary::Binary;
 
 /// Message struct according to https://deepwiki.com/Klipper3d/klipper/3.3-communication-protocol
 
 /// Message type used for all communications
+#[derive(Debug)]
 pub struct Message {
-    length: usize,
-    sequence: u8, // Sequence number doesn't have direction bit for readability
-    payload: Vec<u8>,
-    crc: [u8; 2],
+    pub length: usize,
+    pub sequence: u8, // Sequence number doesn't have direction bit for readability
+    pub payload: Vec<u8>,
+    pub crc: [u8; 2],
 }
 
 impl Message {
@@ -30,11 +33,17 @@ impl Message {
             return None;
         }
 
-        let crc = Self::crc16_ccitt(&payload);
+        let sequence = seq & Self::MESSAGE_SEQ_MASK;
+        let composed_seq = Self::compose_sequence_number(sequence);
+        let mut crc_buf = Vec::with_capacity(2 + payload.len());
+        crc_buf.push(length as u8);
+        crc_buf.push(composed_seq);
+        crc_buf.extend_from_slice(&payload);
+        let crc = Self::crc16_ccitt(&crc_buf);
 
         Some(Self {
             length,
-            sequence: seq & Self::MESSAGE_SEQ_MASK,
+            sequence,
             payload,
             crc,
         })
@@ -103,38 +112,100 @@ impl Binary for Message {
         .encode()
     }
 
-    fn decode(buf: &[u8], _: ()) -> anyhow::Result<Self> {
-        if buf.len() < Self::MESSAGE_MIN {
-            anyhow::bail!("Buffer too short");
+    fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
+        let mut buf: Vec<u8> = Vec::new();
+
+        let mut length_bytes = [0; 1];
+        reader.read_exact(&mut length_bytes)?;
+        let length = length_bytes[0] as usize;
+
+        if length == 0 {
+            anyhow::bail!("Got null packet");
+        } else if length < Self::MESSAGE_MIN {
+            anyhow::bail!("Packet too small");
+        } else if length > Self::MESSAGE_MAX {
+            anyhow::bail!("Packet too large");
         }
 
-        if buf[buf.len() - 1] != Self::MESSAGE_SYNC {
-            anyhow::bail!("Invalid sync marker");
+        // Allocate the fields
+        let mut seq_bytes = [0; 1];
+        let mut payload_bytes = vec![0; length - Self::MESSAGE_MIN];
+        let mut crc_bytes = [0; 2];
+        let mut sync_bytes = [0; 1];
+
+        reader.read_exact(&mut seq_bytes)?;
+        reader.read_exact(&mut payload_bytes)?;
+        reader.read_exact(&mut crc_bytes)?;
+        reader.read_exact(&mut sync_bytes)?;
+
+        let seq = Self::decompose_sequence_number(seq_bytes[0]);
+
+        // println!(
+        //     "seq: {seq:?}, payload: {payload_bytes:?}, crc: {crc_bytes:?}, crc_actual: {crc_actual:?}, sync: {sync_bytes:?}"
+        // );
+
+        // Check sync byte
+        if sync_bytes[0] != Self::MESSAGE_SYNC {
+            anyhow::bail!("Invalid sync byte");
         }
 
-        let length = buf[0] as usize;
+        let crc_actual =
+            Self::crc16_ccitt(&[&length_bytes, &seq_bytes, payload_bytes.as_slice()].concat());
 
-        if length != buf.len() {
-            anyhow::bail!("Length mismatch");
+        if crc_actual != crc_bytes {
+            anyhow::bail!("Invalid crc checksum");
         }
 
-        if length < Self::MESSAGE_MIN || length > Self::MESSAGE_MAX {
-            anyhow::bail!("Invalid length");
-        }
-
-        let sequence = Self::decompose_sequence_number(buf[1]);
-        let payload = buf[2..(length - 3)].to_vec();
-        let crc: [u8; 2] = [buf[length - 3], buf[length - 2]];
-
-        if crc != Self::crc16_ccitt(&payload) {
-            anyhow::bail!("CRC mismatch");
-        }
-
-        Ok(Self {
+        Ok(Message {
             length,
-            sequence,
-            payload,
-            crc,
+            sequence: seq,
+            payload: payload_bytes,
+            crc: crc_bytes,
         })
+
+        // loop {
+        //     while buf.len() >= Self::MESSAGE_MIN {
+        //         let candidate_len = buf[0] as usize;
+
+        //         if candidate_len < Self::MESSAGE_MIN || candidate_len > Self::MESSAGE_MAX {
+        //             buf.remove(0);
+        //             continue;
+        //         }
+
+        //         if buf.len() < candidate_len {
+        //             break;
+        //         }
+
+        //         if buf[candidate_len - 1] != Self::MESSAGE_SYNC {
+        //             buf.remove(0);
+        //             continue;
+        //         }
+
+        //         if (buf[1] & !Self::MESSAGE_SEQ_MASK) != Self::MESSAGE_DEST {
+        //             buf.remove(0);
+        //             continue;
+        //         }
+
+        //         let msg_crc: [u8; 2] = [buf[candidate_len - 3], buf[candidate_len - 2]];
+        //         if msg_crc != Self::crc16_ccitt(&buf[..candidate_len - 3]) {
+        //             buf.remove(0);
+        //             continue;
+        //         }
+
+        //         let sequence = Self::decompose_sequence_number(buf[1]);
+        //         let payload = buf[2..candidate_len - 3].to_vec();
+
+        //         return Ok(Self {
+        //             length: candidate_len,
+        //             sequence,
+        //             payload,
+        //             crc: msg_crc,
+        //         });
+        //     }
+
+        //     let mut byte = [0u8; 1];
+        //     reader.read_exact(&mut byte)?;
+        //     buf.push(byte[0]);
+        // }
     }
 }
