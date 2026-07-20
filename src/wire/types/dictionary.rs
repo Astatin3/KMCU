@@ -1,6 +1,6 @@
 use std::{any, collections::HashMap};
 
-use crate::types::command::{CommandArgFilled, CommandArgOutline, CommandFilled};
+use super::command::{CommandArgFilled, CommandArgOutline, CommandFilled};
 
 /// Represents the list of commands that are sent over
 #[derive(Clone)]

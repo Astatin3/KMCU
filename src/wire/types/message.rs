@@ -2,7 +2,7 @@ use std::io::Read;
 
 use bytes::{BufMut, Bytes, BytesMut};
 
-use crate::{
+use crate::wire::{
     traits::binary::Binary,
     types::{
         command::{CommandArgFilled, CommandFilled},
@@ -38,10 +38,7 @@ fn crc16_ccitt(buf: &[u8]) -> [u8; 2] {
 #[derive(Debug)]
 pub enum Message {
     Serialized(Bytes),
-    Deserialized {
-        id: u16,
-        args: Vec<CommandArgFilled>,
-    },
+    Deserialized(CommandFilled),
 }
 
 impl Message {
@@ -99,9 +96,8 @@ impl Binary for Message {
             Self::Serialized(raw) => {
                 buf.extend_from_slice(raw);
             }
-            Self::Deserialized { id, args } => {
+            Self::Deserialized(cmd) => {
                 let mut payload = BytesMut::with_capacity(MESSAGE_MAX);
-                let cmd = CommandFilled(*id, args.clone());
                 cmd.encode(&mut payload);
 
                 let payload_len = payload.len();
@@ -155,9 +151,6 @@ impl Binary for Message {
 
         let mut cursor = &payload[..];
         let cmd = CommandFilled::decode(&mut cursor, dict)?;
-        Ok(Self::Deserialized {
-            id: cmd.0,
-            args: cmd.1,
-        })
+        Ok(Self::Deserialized(cmd))
     }
 }

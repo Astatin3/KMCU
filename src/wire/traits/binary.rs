@@ -15,11 +15,11 @@ macro_rules! binary_vlq_unsigned {
             type DecodeArg = ();
 
             fn encode(&self, buf: &mut BytesMut) {
-                crate::vlq::encode_int_to(*self as u32, buf);
+                super::super::vlq::encode_int_to(*self as u32, buf);
             }
 
             fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
-                let v = crate::vlq::parse_int(reader)?;
+                let v = super::super::vlq::parse_int(reader)?;
                 Ok(v as $t)
             }
         }
@@ -32,11 +32,11 @@ macro_rules! binary_vlq_signed {
             type DecodeArg = ();
 
             fn encode(&self, buf: &mut BytesMut) {
-                crate::vlq::encode_int_to(*self as u32, buf);
+                super::super::vlq::encode_int_to(*self as u32, buf);
             }
 
             fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
-                let v = crate::vlq::parse_int(reader)?;
+                let v = super::super::vlq::parse_int(reader)?;
                 Ok(v as $t)
             }
         }

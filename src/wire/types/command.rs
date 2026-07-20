@@ -3,26 +3,26 @@ use std::io::Read;
 use anyhow::anyhow;
 use bytes::{BufMut, BytesMut};
 
-use crate::{
+use crate::wire::{
     traits::binary::Binary,
     types::dictionary::{CommandOutline, Dictionary},
 };
 
-/// Type that represents one command to be serialized
+#[derive(Debug)]
 pub struct CommandFilled(pub u16, pub Vec<CommandArgFilled>);
 
 impl Binary for CommandFilled {
     type DecodeArg = Dictionary;
 
     fn encode(&self, buf: &mut BytesMut) {
-        crate::vlq::encode_msgid_to(self.0, buf);
+        super::super::vlq::encode_msgid_to(self.0, buf);
         for arg in &self.1 {
             arg.encode(buf);
         }
     }
 
     fn decode(reader: &mut dyn Read, dict: Dictionary) -> anyhow::Result<Self> {
-        let id = crate::vlq::parse_msgid(reader)?;
+        let id = super::super::vlq::parse_msgid(reader)?;
 
         let outline = dict
             .get_outline(id)
