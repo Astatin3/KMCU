@@ -1,36 +1,45 @@
 use std::io::Read;
 
-use crate::traits::binary::Binary;
+use anyhow::anyhow;
+use bytes::{BufMut, BytesMut};
 
-// MessageTypes = {
-//     '%u': PT_uint32(), '%i': PT_int32(),
-//     '%hu': PT_uint16(), '%hi': PT_int16(),
-//     '%c': PT_byte(),
-//     '%s': PT_string(), '%.*s': PT_progmem_buffer(), '%*s': PT_buffer(),
-// }
+use crate::{
+    traits::binary::Binary,
+    types::dictionary::{CommandOutline, Dictionary},
+};
 
-/// Type that represents one command
-pub struct CommandOutline {
-    pub name: String,
-    pub id: u16,
-    pub parameters: Vec<(String, CommandArgOutline)>,
-}
-
+/// Type that represents one command to be serialized
 pub struct CommandFilled(pub u16, pub Vec<CommandArgFilled>);
 
 impl Binary for CommandFilled {
-    type DecodeArg = CommandOutline;
+    type DecodeArg = Dictionary;
 
-    fn encode(&self) -> Vec<u8> {
-        vec![crate::vlq::encode_msgid(self.0), self.1.encode()].encode()
+    fn encode(&self, buf: &mut BytesMut) {
+        crate::vlq::encode_msgid_to(self.0, buf);
+        for arg in &self.1 {
+            arg.encode(buf);
+        }
     }
 
-    fn decode(_: &mut dyn Read, _outline: CommandOutline) -> anyhow::Result<Self> {
-        unreachable!()
+    fn decode(reader: &mut dyn Read, dict: Dictionary) -> anyhow::Result<Self> {
+        let id = crate::vlq::parse_msgid(reader)?;
+
+        let outline = dict
+            .get_outline(id)
+            .ok_or(anyhow!("No such command with id '{id}'"))?;
+
+        let mut parsed_params = Vec::new();
+
+        for (_, outline) in &outline.parameters {
+            parsed_params.push(CommandArgFilled::decode(reader, *outline)?);
+        }
+
+        Ok(Self(id, parsed_params))
     }
 }
 
 #[allow(non_camel_case_types)]
+#[derive(Clone, Copy, Debug)]
 pub enum CommandArgOutline {
     uint32,
     int32,
@@ -60,6 +69,7 @@ impl CommandArgOutline {
 }
 
 #[allow(non_camel_case_types)]
+#[derive(Clone, Debug)]
 pub enum CommandArgFilled {
     uint32(u32),
     int32(i32),
@@ -74,28 +84,60 @@ pub enum CommandArgFilled {
 impl Binary for CommandArgFilled {
     type DecodeArg = CommandArgOutline;
 
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self, buf: &mut BytesMut) {
         match self {
-            CommandArgFilled::uint32(n) => crate::vlq::encode_int(*n as u32),
-            CommandArgFilled::int32(n) => crate::vlq::encode_int(*n as u32),
-            CommandArgFilled::uint16(n) => crate::vlq::encode_int(*n as u32),
-            CommandArgFilled::int16(n) => crate::vlq::encode_int(*n as u32),
-            CommandArgFilled::byte(n) => crate::vlq::encode_int(*n as u32),
-            CommandArgFilled::string(str) => vec![
-                crate::vlq::encode_int(str.len() as u32),
-                str.clone().into_bytes(),
-            ]
-            .encode(),
+            CommandArgFilled::uint32(n) => n.encode(buf),
+            CommandArgFilled::int32(n) => n.encode(buf),
+            CommandArgFilled::uint16(n) => n.encode(buf),
+            CommandArgFilled::int16(n) => n.encode(buf),
+            CommandArgFilled::byte(n) => n.encode(buf),
+            CommandArgFilled::string(s) => {
+                buf.put_u8(s.len() as u8);
+                buf.extend_from_slice(s.as_bytes());
+            }
             CommandArgFilled::progmem_buffer(items) => {
-                vec![crate::vlq::encode_int(items.len() as u32), items.clone()].encode()
+                buf.put_u8(items.len() as u8);
+                buf.extend_from_slice(items);
             }
             CommandArgFilled::buffer(items) => {
-                vec![crate::vlq::encode_int(items.len() as u32), items.clone()].encode()
+                buf.put_u8(items.len() as u8);
+                buf.extend_from_slice(items);
             }
         }
     }
 
-    fn decode(_: &mut dyn Read, _outline: CommandArgOutline) -> anyhow::Result<Self> {
-        unreachable!()
+    fn decode(reader: &mut dyn Read, outline: CommandArgOutline) -> anyhow::Result<Self> {
+        match outline {
+            CommandArgOutline::uint32 => Ok(Self::uint32(u32::decode(reader, ())?)),
+            CommandArgOutline::int32 => Ok(Self::int32(i32::decode(reader, ())?)),
+            CommandArgOutline::uint16 => Ok(Self::uint16(u16::decode(reader, ())?)),
+            CommandArgOutline::int16 => Ok(Self::int16(i16::decode(reader, ())?)),
+            CommandArgOutline::byte => Ok(Self::byte(u8::decode(reader, ())?)),
+            CommandArgOutline::string => {
+                let mut len_buf = [0u8; 1];
+                reader.read_exact(&mut len_buf)?;
+                let len = len_buf[0] as usize;
+                let mut buf = vec![0u8; len];
+                reader.read_exact(&mut buf)?;
+                let s = String::from_utf8(buf)?;
+                Ok(Self::string(s))
+            }
+            CommandArgOutline::progmem_buffer => {
+                let mut len_buf = [0u8; 1];
+                reader.read_exact(&mut len_buf)?;
+                let len = len_buf[0] as usize;
+                let mut buf = vec![0u8; len];
+                reader.read_exact(&mut buf)?;
+                Ok(Self::progmem_buffer(buf))
+            }
+            CommandArgOutline::buffer => {
+                let mut len_buf = [0u8; 1];
+                reader.read_exact(&mut len_buf)?;
+                let len = len_buf[0] as usize;
+                let mut buf = vec![0u8; len];
+                reader.read_exact(&mut buf)?;
+                Ok(Self::buffer(buf))
+            }
+        }
     }
 }

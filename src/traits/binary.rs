@@ -1,43 +1,61 @@
 use std::io::Read;
 
+use bytes::{BufMut, BytesMut};
+
 pub trait Binary: Sized {
     type DecodeArg;
 
-    fn encode(&self) -> Vec<u8>;
+    fn encode(&self, buf: &mut BytesMut);
     fn decode(reader: &mut dyn Read, arg: Self::DecodeArg) -> anyhow::Result<Self>;
 }
 
-macro_rules! binary_num {
+macro_rules! binary_vlq_unsigned {
     ($t:tt) => {
         impl Binary for $t {
             type DecodeArg = ();
 
-            fn encode(&self) -> Vec<u8> {
-                self.to_le_bytes().to_vec()
+            fn encode(&self, buf: &mut BytesMut) {
+                crate::vlq::encode_int_to(*self as u32, buf);
             }
 
             fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
-                let mut buf = [0u8; std::mem::size_of::<$t>()];
-                reader.read_exact(&mut buf)?;
-                Ok($t::from_le_bytes(buf))
+                let v = crate::vlq::parse_int(reader)?;
+                Ok(v as $t)
             }
         }
     };
 }
 
-// Define binary trait for types
-binary_num!(u32);
-binary_num!(i32);
-binary_num!(u16);
-binary_num!(i16);
-binary_num!(u8);
+macro_rules! binary_vlq_signed {
+    ($t:tt) => {
+        impl Binary for $t {
+            type DecodeArg = ();
 
-// Useful for collections of binary formats
+            fn encode(&self, buf: &mut BytesMut) {
+                crate::vlq::encode_int_to(*self as u32, buf);
+            }
+
+            fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
+                let v = crate::vlq::parse_int(reader)?;
+                Ok(v as $t)
+            }
+        }
+    };
+}
+
+binary_vlq_unsigned!(u32);
+binary_vlq_unsigned!(u16);
+binary_vlq_unsigned!(u8);
+binary_vlq_signed!(i32);
+binary_vlq_signed!(i16);
+
 impl<T: Binary> Binary for Vec<T> {
     type DecodeArg = ();
 
-    fn encode(&self) -> Vec<u8> {
-        self.into_iter().map(|a| a.encode()).flatten().collect()
+    fn encode(&self, buf: &mut BytesMut) {
+        for item in self {
+            item.encode(buf);
+        }
     }
 
     fn decode(_: &mut dyn Read, _: ()) -> anyhow::Result<Self> {

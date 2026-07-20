@@ -2,18 +2,21 @@
 
 use std::env::args;
 
+use bytes::{BufMut, BytesMut};
 use serialport::SerialPort;
 
 use crate::{
     traits::binary::Binary,
     types::{
-        command::{CommandArgFilled, CommandArgOutline, CommandFilled, CommandOutline},
-        message::Message,
+        command::{CommandArgFilled, CommandFilled},
+        dictionary::DEFAULT_DICT,
+        message::{MESSAGE_MAX, MESSAGE_MIN, Message},
     },
 };
 
 mod types {
     pub mod command;
+    pub mod dictionary;
     pub mod message;
     pub mod serial;
 }
@@ -22,6 +25,7 @@ mod traits {
     pub mod binary;
 }
 
+mod config;
 mod vlq;
 
 fn main() -> anyhow::Result<()> {
@@ -66,68 +70,73 @@ impl Connection {
     }
 
     pub fn identify(&mut self) -> anyhow::Result<()> {
-        let command_identify = CommandOutline {
-            name: "identify".to_string(),
-            id: 1,
-            parameters: vec![
-                ("offset".to_string(), CommandArgOutline::uint32),
-                ("count".to_string(), CommandArgOutline::byte),
-            ],
-        };
-
         let mut i = 0;
 
         loop {
-            let byte_start = i * Self::IDENTIFY_COUNT;
+            let byte_start = (i * Self::IDENTIFY_COUNT) as u32;
 
-            let command = CommandFilled(
-                1,
+            self.write(DEFAULT_DICT.fill(
+                "identify",
                 vec![
-                    CommandArgFilled::uint32(byte_start as u32),
+                    CommandArgFilled::uint32(byte_start),
                     CommandArgFilled::byte(Self::IDENTIFY_COUNT as u8),
                 ],
-            );
-
-            self.write(&command);
+            )?);
 
             let response = self.read()?;
+            let _ = self.read()?; // Read the ACK
 
-            if response.payload.len() == 0 {
-                println!("Empty packet, resending...");
-            } else {
-                println!("Response: {response:?}");
-                i += 1;
+            if let Message::Deserialized { id, args } = &response {
+                println!("Response id={id}: {args:?}");
             }
 
-            if i > 100 {
-                break;
-            }
+            i += 1;
         }
 
         Ok(())
     }
 
-    fn write(&mut self, command: &CommandFilled) -> anyhow::Result<()> {
-        let payload = command.encode();
+    fn write(&mut self, command: CommandFilled) -> anyhow::Result<()> {
+        let message = Message::from_command(&command, (self.seq % 16) as u8)
+            .ok_or(anyhow::anyhow!("Message too large"))?;
 
-        let message = Message::new(payload, (self.seq % 16) as u8).unwrap();
-
-        // println!("Sent: {message:?}");
-
-        self.port.write_all(&message.encode())?;
-
-        // self.seq += 1;
+        self.port.write_all(&message.into_bytes())?;
 
         Ok(())
     }
 
     fn read(&mut self) -> anyhow::Result<Message> {
-        let message = Message::decode(&mut self.port, ())?;
+        // Read the raw frame to extract the sequence number
+        let mut len_buf = [0u8; 1];
+        self.port.read_exact(&mut len_buf)?;
+        let length = len_buf[0] as usize;
 
-        // be sure to increment the sequence number
-        self.seq = message.sequence as usize;
+        if length < MESSAGE_MIN || length > MESSAGE_MAX {
+            anyhow::bail!("Invalid frame length: {length}");
+        }
 
-        Ok(message)
+        let mut frame = BytesMut::with_capacity(length);
+        frame.put_u8(len_buf[0]);
+        let mut rest = vec![0u8; length - 1];
+        self.port.read_exact(&mut rest)?;
+        frame.extend_from_slice(&rest);
+
+        self.seq = Message::wire_seq(&frame) as usize;
+
+        // Decode the command from the payload
+        let payload = &frame[2..length - 3];
+        if payload.is_empty() {
+            // ACK — return a Serialized representation of the raw frame
+            return Ok(Message::Serialized(frame.freeze()));
+        }
+
+        let mut cursor = &payload[..];
+        let cmd = CommandFilled::decode(&mut cursor, (*DEFAULT_DICT).clone())?;
+
+        Ok(Message::Deserialized {
+            id: cmd.0,
+            args: cmd.1,
+        })
     }
 
     pub fn run() {}
