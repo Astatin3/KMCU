@@ -1,1 +1,1 @@
-pub mod mcu;
+pub mod klipper_mcu;

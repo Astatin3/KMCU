@@ -56,7 +56,7 @@ impl Connection for Serial {
 
     fn write(&mut self, message: &Message) -> anyhow::Result<()> {
         let mut buf = BytesMut::with_capacity(MESSAGE_MAX);
-        message.encode(&mut buf);
+        message.encode_to(&mut buf);
         self.port.write_all(&buf)?;
         Ok(())
     }

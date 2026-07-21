@@ -1,11 +1,9 @@
-use std::io::Read;
-
 use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::wire::{
     traits::binary::Binary,
     types::{
-        command::{CommandArgFilled, CommandFilled},
+        command::CommandFilled,
         dictionary::Dictionary,
     },
 };
@@ -68,9 +66,9 @@ impl Message {
     }
 
     /// Build a Serialized message directly from a command and sequence number.
-    pub fn from_command(command: &CommandFilled, seq: u8) -> Option<Self> {
+    pub fn from_command(command: &CommandFilled, seq: u8, dict: &Dictionary) -> Option<Self> {
         let mut payload = BytesMut::with_capacity(MESSAGE_MAX);
-        command.encode(&mut payload);
+        command.encode(&mut payload, dict.clone());
         Self::new(payload, seq)
     }
 
@@ -82,75 +80,15 @@ impl Message {
         }
     }
 
+    /// Write the raw wire bytes of a Serialized message to a buffer.
+    pub fn encode_to(&self, buf: &mut BytesMut) {
+        if let Self::Serialized(raw) = self {
+            buf.extend_from_slice(raw);
+        }
+    }
+
     /// Wire sequence number from a raw frame
     pub fn wire_seq(frame: &[u8]) -> u8 {
         decompose_sequence_number(frame[1])
-    }
-}
-
-impl Binary for Message {
-    type DecodeArg = Dictionary;
-
-    fn encode(&self, buf: &mut BytesMut) {
-        match self {
-            Self::Serialized(raw) => {
-                buf.extend_from_slice(raw);
-            }
-            Self::Deserialized(cmd) => {
-                let mut payload = BytesMut::with_capacity(MESSAGE_MAX);
-                cmd.encode(&mut payload);
-
-                let payload_len = payload.len();
-                let length = payload_len + MESSAGE_MIN;
-                let composed = compose_sequence_number(0);
-
-                buf.reserve(length);
-                buf.put_u8(length as u8);
-                buf.put_u8(composed);
-                buf.extend_from_slice(&payload);
-
-                let crc = crc16_ccitt(&buf[buf.len() - payload_len - 2..]);
-                buf.put_u8(crc[0]);
-                buf.put_u8(crc[1]);
-                buf.put_u8(MESSAGE_SYNC);
-            }
-        }
-    }
-
-    fn decode(reader: &mut dyn Read, dict: Dictionary) -> anyhow::Result<Self> {
-        let mut len_buf = [0u8; 1];
-        reader.read_exact(&mut len_buf)?;
-        let length = len_buf[0] as usize;
-
-        if length < MESSAGE_MIN {
-            anyhow::bail!("Packet too small: {length}");
-        }
-        if length > MESSAGE_MAX {
-            anyhow::bail!("Packet too large: {length}");
-        }
-
-        let mut frame = vec![len_buf[0]; length];
-        reader.read_exact(&mut frame[1..])?;
-
-        // Verify sync
-        if frame[length - 1] != MESSAGE_SYNC {
-            anyhow::bail!("Invalid sync byte");
-        }
-
-        // Verify CRC
-        let crc_got = [frame[length - 3], frame[length - 2]];
-        let crc_calc = crc16_ccitt(&frame[..length - 3]);
-        if crc_got != crc_calc {
-            anyhow::bail!("CRC mismatch");
-        }
-
-        let payload = &frame[2..length - 3];
-        if payload.is_empty() {
-            anyhow::bail!("ACK");
-        }
-
-        let mut cursor = &payload[..];
-        let cmd = CommandFilled::decode(&mut cursor, dict)?;
-        Ok(Self::Deserialized(cmd))
     }
 }

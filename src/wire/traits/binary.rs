@@ -3,18 +3,20 @@ use std::io::Read;
 use bytes::{BufMut, BytesMut};
 
 pub trait Binary: Sized {
+    type EncodeArg;
     type DecodeArg;
 
-    fn encode(&self, buf: &mut BytesMut);
+    fn encode(&self, buf: &mut BytesMut, arg: Self::EncodeArg);
     fn decode(reader: &mut dyn Read, arg: Self::DecodeArg) -> anyhow::Result<Self>;
 }
 
 macro_rules! binary_vlq_unsigned {
     ($t:tt) => {
         impl Binary for $t {
+            type EncodeArg = ();
             type DecodeArg = ();
 
-            fn encode(&self, buf: &mut BytesMut) {
+            fn encode(&self, buf: &mut BytesMut, _: ()) {
                 super::super::vlq::encode_int_to(*self as u32, buf);
             }
 
@@ -29,9 +31,10 @@ macro_rules! binary_vlq_unsigned {
 macro_rules! binary_vlq_signed {
     ($t:tt) => {
         impl Binary for $t {
+            type EncodeArg = ();
             type DecodeArg = ();
 
-            fn encode(&self, buf: &mut BytesMut) {
+            fn encode(&self, buf: &mut BytesMut, _: ()) {
                 super::super::vlq::encode_int_to(*self as u32, buf);
             }
 
@@ -49,12 +52,14 @@ binary_vlq_unsigned!(u8);
 binary_vlq_signed!(i32);
 binary_vlq_signed!(i16);
 
-impl<T: Binary> Binary for Vec<T> {
+#[allow(invalid_type_param_default)]
+impl<T: Binary<EncodeArg = ()>> Binary for Vec<T> {
+    type EncodeArg = ();
     type DecodeArg = ();
 
-    fn encode(&self, buf: &mut BytesMut) {
+    fn encode(&self, buf: &mut BytesMut, _: ()) {
         for item in self {
-            item.encode(buf);
+            item.encode(buf, ());
         }
     }
 
