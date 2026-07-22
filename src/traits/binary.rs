@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 
 pub trait Binary: Sized {
     type EncodeArg;
@@ -17,11 +17,11 @@ macro_rules! binary_vlq_unsigned {
             type DecodeArg = ();
 
             fn encode(&self, buf: &mut BytesMut, _: ()) {
-                super::super::vlq::encode_int_to(*self as u32, buf);
+                crate::wire::vlq::encode_int_to(*self as u32, buf);
             }
 
             fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
-                let v = super::super::vlq::parse_int(reader)?;
+                let v = crate::wire::vlq::parse_int(reader)?;
                 Ok(v as $t)
             }
         }
@@ -35,11 +35,11 @@ macro_rules! binary_vlq_signed {
             type DecodeArg = ();
 
             fn encode(&self, buf: &mut BytesMut, _: ()) {
-                super::super::vlq::encode_int_to(*self as u32, buf);
+                crate::wire::vlq::encode_int_to(*self as u32, buf);
             }
 
             fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
-                let v = super::super::vlq::parse_int(reader)?;
+                let v = crate::wire::vlq::parse_int(reader)?;
                 Ok(v as $t)
             }
         }

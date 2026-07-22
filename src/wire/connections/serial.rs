@@ -1,12 +1,12 @@
 use bytes::{BufMut, BytesMut};
 use serialport::SerialPort;
 
-use crate::wire::{
+use crate::{
     traits::{binary::Binary, connection::Connection},
-    types::{
+    wire::types::{
         command::CommandFilled,
         dictionary::DEFAULT_DICT,
-        message::{Message, MESSAGE_MAX, MESSAGE_MIN},
+        message::{MESSAGE_MAX, MESSAGE_MIN, Message},
     },
 };
 

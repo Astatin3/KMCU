@@ -4,9 +4,9 @@ use anyhow::anyhow;
 use bytes::{BufMut, BytesMut};
 use serde_json::Value;
 
-use crate::wire::{
+use crate::{
     traits::binary::Binary,
-    types::dictionary::{ArgType, CommandOutline, Dictionary},
+    wire::types::dictionary::{ArgType, CommandOutline, Dictionary},
 };
 
 #[derive(Debug, Clone)]
@@ -24,10 +24,7 @@ impl CommandFilled {
     }
 
     pub fn get_buffer(&self, key: &str) -> Vec<u8> {
-        self.args
-            .get(key)
-            .map(value_to_bytes)
-            .unwrap_or_default()
+        self.args.get(key).map(value_to_bytes).unwrap_or_default()
     }
 
     pub fn take_buffer(&mut self, key: &str) -> Option<Vec<u8>> {
@@ -107,9 +104,7 @@ fn encode_value(value: &Value, arg_type: &ArgType, buf: &mut BytesMut) {
 
 fn decode_value(reader: &mut dyn Read, arg_type: &ArgType) -> anyhow::Result<Value> {
     match arg_type {
-        ArgType::Uint32 => Ok(Value::Number(
-            super::super::vlq::parse_int(reader)?.into(),
-        )),
+        ArgType::Uint32 => Ok(Value::Number(super::super::vlq::parse_int(reader)?.into())),
         ArgType::Int32 => Ok(Value::Number(
             (super::super::vlq::parse_int(reader)? as i32).into(),
         )),

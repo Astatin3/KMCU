@@ -1,23 +1,30 @@
-#![allow(unused)]
-
 #[macro_use]
 extern crate log;
 
-use std::{any, env::args};
-
-use serde_json::{Value, json};
+use std::env::args;
 
 use crate::config::PrinterConfig;
 
+#[allow(unused)]
 mod config;
+
 mod runtime;
+
+#[allow(unused)]
 mod wire;
+
+mod traits {
+    pub mod binary;
+    pub mod connection;
+    pub mod from_config;
+    pub mod mcu;
+}
 
 fn main() {
     pretty_env_logger::init();
 
     // Catch errors
-    if let Err(e) = run() {
+    if let Err(e) = run_mcu() {
         log::error!("{}", e);
     }
 }
@@ -30,6 +37,7 @@ fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(unused)]
 fn run_mcu() -> anyhow::Result<()> {
     let device = args()
         .nth(1)

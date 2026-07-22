@@ -9,7 +9,7 @@ pub enum Axis {
     Tmc2209(Tmc2209Config),
     #[serde(rename = "a4988")]
     A4988(A4988Config),
-    #[serde(rename = "a4988")]
+    #[serde(rename = "dummy")]
     Dummy,
 }
 

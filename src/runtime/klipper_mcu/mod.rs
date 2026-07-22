@@ -1,6 +1,6 @@
-use crate::wire::{
+use crate::{
     traits::connection::Connection,
-    types::{
+    wire::types::{
         command::CommandFilled,
         dictionary::{DEFAULT_DICT, Dictionary},
         message::Message,
@@ -8,7 +8,6 @@ use crate::wire::{
 };
 
 pub mod identify;
-pub use identify::IdentifyResults;
 
 pub struct MCU<C: Connection> {
     connection: C,
@@ -32,6 +31,9 @@ impl<C: Connection> MCU<C> {
         };
 
         let results = this.identify()?;
+
+        debug!("Received identify results: {results:?}");
+
         let (commands, responses, output) = results.build_dictionaries()?;
         this.commands = commands;
         this.responses = responses;

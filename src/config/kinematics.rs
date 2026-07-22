@@ -4,17 +4,18 @@ use serde::Deserialize;
 #[serde(tag = "type")]
 pub enum Kinematics {
     #[serde(rename = "core_xy")]
-    CoreXY {
-        #[serde(flatten)]
-        general: GeneralKinematics,
-
-        axis_x: [String; 2],
-        axis_y: [String; 2],
-        axis_z: [String; 2],
-
-        axis_extruder: [String; 2],
-    },
+    CoreXY(CoreXYKinematics),
     // TODO: add support for more types
+}
+#[derive(Debug, Deserialize)]
+pub struct CoreXYKinematics {
+    #[serde(flatten)]
+    pub general: GeneralKinematics,
+
+    pub axis_x: [String; 2],
+    pub axis_y: [String; 2],
+    pub axis_z: [String; 2],
+    pub axis_extruder: [String; 2],
 }
 
 #[derive(Debug, Deserialize)]

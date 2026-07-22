@@ -1,11 +1,8 @@
 use bytes::{BufMut, Bytes, BytesMut};
 
-use crate::wire::{
+use crate::{
     traits::binary::Binary,
-    types::{
-        command::CommandFilled,
-        dictionary::Dictionary,
-    },
+    wire::types::{command::CommandFilled, dictionary::Dictionary},
 };
 
 pub const MESSAGE_MIN: usize = 5;

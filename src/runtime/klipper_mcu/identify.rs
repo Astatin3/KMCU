@@ -1,15 +1,13 @@
+use crate::traits::connection::Connection;
 use std::collections::HashMap;
 
 use serde::Deserialize;
 
 use crate::{
     runtime::klipper_mcu::MCU,
-    wire::{
-        Connection,
-        types::{
-            command::CommandFilled,
-            dictionary::{CommandOutline, Dictionary},
-        },
+    wire::types::{
+        command::CommandFilled,
+        dictionary::{CommandOutline, Dictionary},
     },
 };
 
@@ -31,6 +29,7 @@ impl IdentifyResults {
         let mut z = flate2::read::ZlibDecoder::new(zlib_bytes);
         let mut s = String::new();
         std::io::Read::read_to_string(&mut z, &mut s)?;
+        debug!("Got klipper string: {s}");
         let results: Self = serde_json::from_str(&s)?;
         Ok(results)
     }
