@@ -1,21 +1,32 @@
 // use serde::;
+pub mod axis;
+pub mod connection;
+pub mod kinematics;
+pub mod klipper_mcu;
+pub mod pin;
+pub mod sim_mcu;
 
 use std::collections::HashMap;
 
 use serde::Deserialize;
 
-#[derive(Deserialize)]
-pub struct Config {
-    mcu: HashMap<String, MCU>,
+use crate::config::{
+    connection::Connection, kinematics::Kinematics, klipper_mcu::KlipperMCU, pin::Pin,
+    sim_mcu::SimMCU,
+};
+
+#[derive(Debug, Deserialize)]
+pub struct PrinterConfig {
+    pub kinematics: Kinematics,
+
+    #[serde(default)]
+    pub klipper_mcu: HashMap<String, KlipperMCU>,
+    #[serde(default)]
+    pub sim_mcu: HashMap<String, SimMCU>,
 }
 
-#[derive(Deserialize)]
-pub struct MCU {
-    serial: Option<Serial>,
-}
-
-#[derive(Deserialize)]
-pub struct Serial {
-    path: String,
-    buad: u32,
+impl PrinterConfig {
+    pub fn parse(config_string: &str) -> anyhow::Result<Self> {
+        Ok(toml::from_str(config_string)?)
+    }
 }

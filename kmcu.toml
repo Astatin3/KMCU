@@ -1,0 +1,29 @@
+[kinematics]
+type = "core_xy" # Different types of kinematics types are supported
+
+# TODO: Add units to the quantities
+max_velocity = 500
+max_accel = 20000
+max_z_velocity = 50
+max_z_accel = 1200
+x_range=[0,256]
+y_range=[0,256]
+z_range=[0,256]
+square_corner_velocity=9.0
+
+# What MCUs hold what axes
+axis_x = ["mainboard", "stepper_x"]
+axis_y = ["mainboard", "stepper_y"]
+axis_z = ["mainboard", "stepper_z"]
+axis_extruder = ["toolhead", "stepper_extruder"]
+
+
+[sim_mcu.mainboard.axes]
+
+stepper_x = { type = "dummy" }
+stepper_y = { type = "dummy" }
+stepper_z = { type = "dummy" }
+
+
+[sim_mcu.toolhead.axes]
+stepper_extruder = { type = "dummy" }

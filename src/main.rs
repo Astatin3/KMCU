@@ -1,10 +1,13 @@
 #![allow(unused)]
-#![macro_use]
+
+#[macro_use]
 extern crate log;
 
-use std::env::args;
+use std::{any, env::args};
 
 use serde_json::{Value, json};
+
+use crate::config::PrinterConfig;
 
 mod config;
 mod runtime;
@@ -20,6 +23,14 @@ fn main() {
 }
 
 fn run() -> anyhow::Result<()> {
+    let config = PrinterConfig::parse(include_str!("../kmcu.toml"))?;
+
+    info!("Read config: {config:?}");
+
+    Ok(())
+}
+
+fn run_mcu() -> anyhow::Result<()> {
     let device = args()
         .nth(1)
         .ok_or(anyhow::anyhow!("Must specify device!"))?;
