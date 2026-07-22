@@ -12,10 +12,10 @@ pub struct CoreXYKinematics {
     #[serde(flatten)]
     pub general: GeneralKinematics,
 
-    pub axis_x: [String; 2],
-    pub axis_y: [String; 2],
-    pub axis_z: [String; 2],
-    pub axis_extruder: [String; 2],
+    pub axis_x: (String, String),
+    pub axis_y: (String, String),
+    pub axis_z: (String, String),
+    pub axis_extruder: (String, String),
 }
 
 #[derive(Debug, Deserialize)]

@@ -3,7 +3,10 @@ extern crate log;
 
 use std::env::args;
 
-use crate::config::PrinterConfig;
+use crate::{
+    config::PrinterConfig, runtime::printer_runtime::PrinterRuntime,
+    traits::from_config::FromConfig,
+};
 
 #[allow(unused)]
 mod config;
@@ -14,6 +17,7 @@ mod runtime;
 mod wire;
 
 mod traits {
+    pub mod axis;
     pub mod binary;
     pub mod connection;
     pub mod from_config;
@@ -24,7 +28,7 @@ fn main() {
     pretty_env_logger::init();
 
     // Catch errors
-    if let Err(e) = run_mcu() {
+    if let Err(e) = run() {
         log::error!("{}", e);
     }
 }
@@ -32,7 +36,11 @@ fn main() {
 fn run() -> anyhow::Result<()> {
     let config = PrinterConfig::parse(include_str!("../kmcu.toml"))?;
 
-    info!("Read config: {config:?}");
+    let printer = PrinterRuntime::from_config(config)?;
+
+    // printer.run
+
+    // info!("Read config: {config:?}");
 
     Ok(())
 }

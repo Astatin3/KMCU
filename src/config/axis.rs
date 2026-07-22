@@ -4,7 +4,7 @@ use crate::config::pin::Pin;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
-pub enum Axis {
+pub enum AxisConfig {
     #[serde(rename = "tmc2209")]
     Tmc2209(Tmc2209Config),
     #[serde(rename = "a4988")]
@@ -14,18 +14,18 @@ pub enum Axis {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct AxisConfig {
-    step_pin: Pin,
-    dir_pin: Pin,
+pub struct GeneralAxisConfig {
+    step_pin: String,
+    dir_pin: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Tmc2209Config {
-    uart_pin: Pin,
+    uart_pin: String,
     run_current: f32,
 
     #[serde(flatten)]
-    config: AxisConfig,
+    config: GeneralAxisConfig,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,5 +33,5 @@ pub struct A4988Config {
     other_config: f32,
 
     #[serde(flatten)]
-    config: AxisConfig,
+    config: GeneralAxisConfig,
 }

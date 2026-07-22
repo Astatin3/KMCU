@@ -11,18 +11,28 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use crate::config::{
-    connection::Connection, kinematics::Kinematics, klipper_mcu::KlipperMCU, pin::Pin,
-    sim_mcu::SimMCU,
+    axis::AxisConfig, connection::Connection, kinematics::Kinematics, klipper_mcu::KlipperMCU,
+    pin::Pin, sim_mcu::SimMCUConfig,
 };
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PrinterConfig {
     pub kinematics: Kinematics,
 
     #[serde(default)]
-    pub klipper_mcu: HashMap<String, KlipperMCU>,
+    pub mcu: HashMap<String, MCUConfig>,
     #[serde(default)]
-    pub sim_mcu: HashMap<String, SimMCU>,
+    pub axis: HashMap<String, AxisConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum MCUConfig {
+    #[serde(rename = "sim")]
+    Sim(SimMCUConfig),
+    #[serde(rename = "klipper")]
+    Klipper(KlipperMCU),
 }
 
 impl PrinterConfig {

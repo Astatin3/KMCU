@@ -17,13 +17,15 @@ axis_y = ["mainboard", "stepper_y"]
 axis_z = ["mainboard", "stepper_z"]
 axis_extruder = ["toolhead", "stepper_extruder"]
 
+[mcu.mainboard]
+type = "sim"
 
-[sim_mcu.mainboard.axes]
+[mcu.toolhead]
+type = "sim"
 
+[axis]
 stepper_x = { type = "dummy" }
 stepper_y = { type = "dummy" }
 stepper_z = { type = "dummy" }
 
-
-[sim_mcu.toolhead.axes]
 stepper_extruder = { type = "dummy" }
