@@ -1,6 +1,6 @@
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::time::Duration;
 
-use crate::{config::axis::DummyAxisConfig, traits::axis::Axis};
+use crate::{config::DummyAxisConfig, traits::axis::Axis};
 
 pub struct DummyAxis {
     config: DummyAxisConfig,

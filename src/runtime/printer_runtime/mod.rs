@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    config::{MCUConfig, PrinterConfig, kinematics},
-    runtime::{core_xy::CoreXYRuntime, sim_mcu::SimMCURuntime},
+    config::{Kinematics, MCUConfig, PrinterConfig},
+    runtime::{core_xy::CoreXYRuntime, klipper_mcu::KlipperMCURuntime, sim_mcu::SimMCURuntime},
     traits::{from_config::FromConfig, mcu::MCU},
 };
 
@@ -11,7 +11,7 @@ pub struct PrinterRuntime {
 }
 
 impl PrinterRuntime {
-    pub fn alive(&self) -> anyhow::Result<bool> {
+    pub fn alive(&self) -> anyhow::Result<()> {
         self.kinematics.alive()
     }
 }
@@ -31,6 +31,11 @@ impl FromConfig for PrinterRuntime {
                     Rc::new(RefCell::new(SimMCURuntime::from_config(sim_mcuconfig)?))
                         as Rc<RefCell<dyn MCU>>
                 }
+                MCUConfig::Klipper(klipper_mcuconfig) => Rc::new(RefCell::new(
+                    KlipperMCURuntime::from_config(klipper_mcuconfig).map_err(|e| {
+                        anyhow::anyhow!("Failed to start Klipper MCU '{name}': {e}")
+                    })?,
+                )) as Rc<RefCell<dyn MCU>>,
 
                 _ => todo!(),
             };
@@ -41,7 +46,7 @@ impl FromConfig for PrinterRuntime {
         info!("Registered {} MCUs", mcus.len());
 
         let kinematics = match config.kinematics {
-            kinematics::Kinematics::CoreXY(core_xykinematics) => {
+            Kinematics::CoreXY(core_xykinematics) => {
                 CoreXYRuntime::from_config((core_xykinematics, config.axis, mcus))?
             }
         };

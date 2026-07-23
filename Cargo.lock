@@ -9,6 +9,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "flate2",
+ "libc",
  "log",
  "pretty_env_logger",
  "serde",

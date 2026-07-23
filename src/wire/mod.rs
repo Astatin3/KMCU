@@ -6,5 +6,3 @@ pub(crate) mod types {
     pub mod message;
     pub mod serial;
 }
-
-pub mod connections;

@@ -22,32 +22,37 @@ impl Iterator for GcodeIter {
     type Item = Gcode;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.lines.next() {
-            // If it's not an error
-            Some(Ok(line)) => match from_str::<Gcode>(&line) {
-                Ok(gcode) => Some(gcode),
+        loop {
+            let line_result = self.lines.next();
+
+            let line = match line_result {
+                Some(Ok(line)) => line,
+
+                Some(Err(e)) => {
+                    warn!("Error reading G-Code file: {e}");
+                    return None;
+                }
+
+                None => {
+                    warn!("EOF");
+                    return None;
+                }
+            };
+
+            match from_str::<Gcode>(&line) {
+                // If it's not an error
+                Ok(gcode) => return Some(gcode),
 
                 // Get the next one if it's a comment or blank
-                // I hope the stack doesn't get filled.
-                Err(Error::BlankLine) | Err(Error::CommentOnly) => self.next(),
+                Err(Error::BlankLine) | Err(Error::CommentOnly) => continue,
 
                 // We just call unknown commands macros and call it a day
-                Err(Error::UnknownCommand(cmd)) => Some(Gcode::Macro(cmd)),
+                Err(Error::UnknownCommand(cmd)) => return Some(Gcode::Macro(cmd)),
 
                 Err(e) => {
                     warn!("Error parsing G-Code: {e}");
-                    None
+                    return None;
                 }
-            },
-
-            Some(Err(e)) => {
-                warn!("Error reading G-Code file: {e}");
-                None
-            }
-
-            None => {
-                warn!("EOF");
-                None
             }
         }
     }

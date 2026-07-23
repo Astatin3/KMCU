@@ -1,5 +1,5 @@
 use crate::{
-    config::sim_mcu::SimMCUConfig,
+    config::SimMCUConfig,
     traits::{from_config::FromConfig, mcu::MCU},
 };
 
@@ -8,8 +8,8 @@ pub struct SimMCURuntime {
 }
 
 impl MCU for SimMCURuntime {
-    fn alive(&mut self) -> anyhow::Result<bool> {
-        Ok(true)
+    fn alive(&mut self) -> anyhow::Result<()> {
+        Ok(())
     }
 }
 

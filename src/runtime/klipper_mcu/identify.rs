@@ -1,10 +1,9 @@
-use crate::traits::connection::Connection;
 use std::collections::HashMap;
 
 use serde::Deserialize;
 
 use crate::{
-    runtime::klipper_mcu::KlipperMCU,
+    runtime::klipper_mcu::KlipperMCURuntime,
     wire::types::{
         command::CommandFilled,
         dictionary::{CommandOutline, Dictionary},
@@ -62,7 +61,7 @@ impl IdentifyResults {
 
 const IDENTIFY_COUNT: usize = 40;
 
-impl<C: Connection> KlipperMCU<C> {
+impl KlipperMCURuntime {
     /// Reads the identify table from the MCU, decompresses it, and parses the JSON.
     pub fn identify(&mut self) -> anyhow::Result<IdentifyResults> {
         let mut i = 0;
@@ -71,7 +70,7 @@ impl<C: Connection> KlipperMCU<C> {
         loop {
             let byte_start = (i * IDENTIFY_COUNT) as u32;
 
-            self.write(CommandFilled::new(
+            self.send_command(&CommandFilled::new(
                 "identify",
                 serde_json::json!({
                     "offset": byte_start,
@@ -79,18 +78,16 @@ impl<C: Connection> KlipperMCU<C> {
                 }),
             ))?;
 
-            // For some reason it sends two packets per, this just drops the
-            // ACK packet that's also returned
-            let response = self.read()?;
-            let _ = self.read()?; // Read the ACK
+            // Two packets per request: the response and an ACK
+            let cmd = self.recv_command()?;
+            // let _ = self.recv_frame_or_ack()?;
 
-            if let crate::wire::types::message::Message::Deserialized(mut cmd) = response {
-                let buf = cmd.take_buffer("data").unwrap_or_default();
-                if buf.is_empty() {
-                    break;
-                }
-                zlib_bytes.extend_from_slice(&buf);
+            let mut cmd = cmd;
+            let buf = cmd.take_buffer("data").unwrap_or_default();
+            if buf.is_empty() {
+                break;
             }
+            zlib_bytes.extend_from_slice(&buf);
 
             i += 1;
         }

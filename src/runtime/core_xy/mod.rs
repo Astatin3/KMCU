@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use anyhow::anyhow;
 
 use crate::{
-    config::{axis::AxisConfig, kinematics::CoreXYKinematics},
+    config::{AxisConfig, CoreXYKinematics},
     runtime::axes::DummyAxis,
     traits::{axis::Axis, from_config::FromConfig, mcu::MCU},
 };
@@ -19,14 +19,14 @@ pub struct CoreXYRuntime {
 }
 
 impl CoreXYRuntime {
-    pub fn alive(&self) -> anyhow::Result<bool> {
-        for (_, mcu) in &self.mcus {
-            if !mcu.borrow_mut().alive()? {
-                return Ok(false);
-            }
+    pub fn alive(&self) -> anyhow::Result<()> {
+        for (name, mcu) in &self.mcus {
+            mcu.borrow_mut()
+                .alive()
+                .map_err(|e| anyhow::anyhow!("Failed to run alive check for MCU '{name}': {e}"))?;
         }
 
-        Ok(true)
+        Ok(())
     }
 }
 

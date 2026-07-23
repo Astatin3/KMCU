@@ -8,6 +8,7 @@ anyhow = "1.0.104"
 bytes = "1.0.0"
 serialport = "4.9.0"
 static_init = "1.0.4"
+libc = "0.2"
 
 
 serde = {version = "1.0.229", features = ["derive"]}

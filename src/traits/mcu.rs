@@ -1,3 +1,3 @@
 pub trait MCU {
-    fn alive(&mut self) -> anyhow::Result<bool>;
+    fn alive(&mut self) -> anyhow::Result<()>;
 }

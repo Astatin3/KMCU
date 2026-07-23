@@ -1,15 +1,15 @@
-use bytes::{BufMut, Bytes, BytesMut};
+use std::io::{Read, Write};
+use std::time::Instant;
 
-use crate::{
-    traits::binary::Binary,
-    wire::types::{command::CommandFilled, dictionary::Dictionary},
-};
+use bytes::{BufMut, Bytes, BytesMut};
 
 pub const MESSAGE_MIN: usize = 5;
 pub const MESSAGE_MAX: usize = 64;
 pub const MESSAGE_SYNC: u8 = 0x7e;
 pub const MESSAGE_DEST: u8 = 0x10;
 pub const MESSAGE_SEQ_MASK: u8 = 0x0f;
+const MESSAGE_HEADER_SIZE: usize = 2;
+const MESSAGE_TRAILER_SIZE: usize = 3;
 
 fn compose_sequence_number(seq: u8) -> u8 {
     (seq & MESSAGE_SEQ_MASK) | MESSAGE_DEST
@@ -30,62 +30,158 @@ fn crc16_ccitt(buf: &[u8]) -> [u8; 2] {
     [(crc >> 8) as u8, (crc & 0xff) as u8]
 }
 
-#[derive(Debug)]
-pub enum Message {
-    Serialized(Bytes),
-    Deserialized(CommandFilled),
+#[derive(Debug, Clone)]
+pub struct Frame {
+    raw: Bytes,
 }
 
-impl Message {
-    /// Build a Serialized message from a pre-encoded payload and sequence number.
-    /// Uses a single BytesMut allocation for the entire frame.
-    pub fn new(payload: BytesMut, seq: u8) -> Option<Self> {
+impl Frame {
+    /// Build a new Frame from a payload and sequence number.
+    pub fn new(payload: &[u8], seq: u8) -> Option<Self> {
         let payload_len = payload.len();
         let length = payload_len + MESSAGE_MIN;
         if length > MESSAGE_MAX {
             return None;
         }
 
-        let seq = seq & MESSAGE_SEQ_MASK;
         let composed = compose_sequence_number(seq);
 
-        let mut frame = BytesMut::with_capacity(length);
-        frame.put_u8(length as u8);
-        frame.put_u8(composed);
-        frame.extend_from_slice(&payload);
+        let mut buf = BytesMut::with_capacity(length);
+        buf.put_u8(length as u8);
+        buf.put_u8(composed);
+        buf.extend_from_slice(payload);
 
-        let crc = crc16_ccitt(&frame);
-        frame.put_u8(crc[0]);
-        frame.put_u8(crc[1]);
-        frame.put_u8(MESSAGE_SYNC);
+        let crc = crc16_ccitt(&buf);
+        buf.put_u8(crc[0]);
+        buf.put_u8(crc[1]);
+        buf.put_u8(MESSAGE_SYNC);
 
-        Some(Self::Serialized(frame.freeze()))
+        Some(Self {
+            raw: buf.freeze(),
+        })
     }
 
-    /// Build a Serialized message directly from a command and sequence number.
-    pub fn from_command(command: &CommandFilled, seq: u8, dict: &Dictionary) -> Option<Self> {
-        let mut payload = BytesMut::with_capacity(MESSAGE_MAX);
-        command.encode(&mut payload, dict.clone());
-        Self::new(payload, seq)
+    /// Write the raw frame bytes to a stream.
+    pub fn write_to(&self, writer: &mut dyn Write) -> anyhow::Result<()> {
+        writer
+            .write_all(&self.raw)
+            .map_err(|e| anyhow::anyhow!("Failed to write frame: {e}"))
     }
 
-    /// Consume the message and return the raw wire bytes.
+    /// Read a single valid frame from a byte stream.
+    ///
+    /// Uses sync-anchored validation: scans for `0x7e` sync bytes, then
+    /// checks if the length byte and CRC are consistent at that position.
+    /// Stale/garbage bytes before the frame are silently discarded.
+    ///
+    /// Returns an error if `deadline` is reached before a valid frame arrives.
+    pub fn read_from(reader: &mut dyn Read, deadline: Instant) -> anyhow::Result<Self> {
+        let mut buf = Vec::with_capacity(MESSAGE_MAX * 2);
+        let mut scratch = [0u8; 1];
+
+        loop {
+            if Instant::now() >= deadline {
+                anyhow::bail!("Timed out waiting for frame");
+            }
+
+            // Fill buffer
+            while buf.len() < MESSAGE_MAX {
+                match reader.read(&mut scratch) {
+                    Ok(0) => anyhow::bail!("Connection closed"),
+                    Ok(_) => buf.push(scratch[0]),
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut =>
+                    {
+                        break;
+                    }
+                    Err(e) => return Err(e.into()),
+                }
+            }
+
+            if buf.is_empty() {
+                anyhow::bail!("No data available");
+            }
+
+            // Sync-anchored scan: for each 0x7e in the buffer, check if it
+            // forms a valid frame with a preceding length byte.
+            if let Some((frame_start, frame_len)) = find_frame(&buf) {
+                let frame_bytes = buf[frame_start..frame_start + frame_len].to_vec();
+
+                if frame_start > 0 {
+                    trace!("Discarded {} stale bytes", frame_start);
+                }
+
+                return Ok(Self {
+                    raw: Bytes::from(frame_bytes),
+                });
+            }
+
+            // No complete frame yet. If buffer is getting large, trim garbage.
+            if buf.len() >= MESSAGE_MAX * 2 {
+                let trim = buf.len() - MESSAGE_MAX;
+                buf.drain(..trim);
+                trace!("Buffer overflow, discarded {} bytes", trim);
+            }
+        }
+    }
+
+    /// Sequence number from the frame header.
+    pub fn seq(&self) -> u8 {
+        decompose_sequence_number(self.raw[1])
+    }
+
+    /// The payload bytes (between header and trailer).
+    pub fn payload(&self) -> &[u8] {
+        let len = self.raw.len();
+        &self.raw[MESSAGE_HEADER_SIZE..len - MESSAGE_TRAILER_SIZE]
+    }
+
+    /// True if the payload is empty (ACK/NAK).
+    pub fn is_empty(&self) -> bool {
+        self.payload().is_empty()
+    }
+
+    /// Consume the frame and return the raw wire bytes.
     pub fn into_bytes(self) -> Bytes {
-        match self {
-            Self::Serialized(raw) => raw,
-            Self::Deserialized { .. } => panic!("into_bytes called on Deserialized message"),
+        self.raw
+    }
+}
+
+/// Scan a buffer for a valid Klipper frame using sync-anchored validation.
+///
+/// Returns `(start_index, frame_length)` if found, where the frame occupies
+/// `buf[start..start+length]`.
+fn find_frame(buf: &[u8]) -> Option<(usize, usize)> {
+    let len = buf.len();
+
+    for j in 0..len {
+        if buf[j] != MESSAGE_SYNC {
+            continue;
+        }
+
+        // Found a sync byte at position j. Check all valid frame lengths
+        // that would place the sync at this position.
+        let max_l = (j + 1).min(MESSAGE_MAX);
+        for l in (MESSAGE_MIN..=max_l).rev() {
+            let i = j + 1 - l;
+
+            // Length self-consistency: buf[i] must equal l
+            if buf[i] != l as u8 {
+                continue;
+            }
+
+            // Verify CRC: computed over buf[i..i+l-3], should match buf[i+l-3..i+l-1]
+            let crc_slice = &buf[i..i + l - MESSAGE_TRAILER_SIZE];
+            let wire_crc = [buf[i + l - 3], buf[i + l - 2]];
+            let computed_crc = crc16_ccitt(crc_slice);
+
+            if wire_crc != computed_crc {
+                continue;
+            }
+
+            return Some((i, l));
         }
     }
 
-    /// Write the raw wire bytes of a Serialized message to a buffer.
-    pub fn encode_to(&self, buf: &mut BytesMut) {
-        if let Self::Serialized(raw) = self {
-            buf.extend_from_slice(raw);
-        }
-    }
-
-    /// Wire sequence number from a raw frame
-    pub fn wire_seq(frame: &[u8]) -> u8 {
-        decompose_sequence_number(frame[1])
-    }
+    None
 }

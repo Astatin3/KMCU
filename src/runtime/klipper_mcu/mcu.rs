@@ -1,17 +1,17 @@
 use serde_json::json;
 
 use crate::{
-    runtime::klipper_mcu::KlipperMCU,
-    traits::{connection::Connection, mcu::MCU},
+    runtime::klipper_mcu::KlipperMCURuntime,
+    traits::mcu::MCU,
     wire::types::command::CommandFilled,
 };
 
-impl<C: Connection> MCU for KlipperMCU<C> {
-    fn alive(&mut self) -> anyhow::Result<bool> {
-        self.write(CommandFilled::new("debug_ping", json!({"data": []})))?;
+impl MCU for KlipperMCURuntime {
+    fn alive(&mut self) -> anyhow::Result<()> {
+        self.send_command(&CommandFilled::new("debug_ping", json!({"data": []})))?;
 
-        let _ = self.read()?;
+        let _ = self.recv_command()?;
 
-        Ok(false)
+        Ok(())
     }
 }
