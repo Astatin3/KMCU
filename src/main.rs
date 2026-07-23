@@ -16,6 +16,8 @@ mod runtime;
 #[allow(unused)]
 mod wire;
 
+mod gcode;
+
 mod traits {
     pub mod axis;
     pub mod binary;
@@ -38,6 +40,8 @@ fn run() -> anyhow::Result<()> {
 
     let printer = PrinterRuntime::from_config(config)?;
 
+    info!("Is alive: {}", printer.alive()?);
+
     // printer.run
 
     // info!("Read config: {config:?}");
@@ -57,7 +61,7 @@ fn run_mcu() -> anyhow::Result<()> {
 
     println!("Opening port...");
     let serial = wire::connections::serial::Serial::open(&device, buad)?;
-    let mut mcu = runtime::klipper_mcu::MCU::new(serial)?;
+    let mut mcu = runtime::klipper_mcu::KlipperMCU::new(serial)?;
 
     Ok(())
 }

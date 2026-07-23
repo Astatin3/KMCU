@@ -18,6 +18,18 @@ pub struct CoreXYRuntime {
     axis_extruder: Box<dyn Axis>,
 }
 
+impl CoreXYRuntime {
+    pub fn alive(&self) -> anyhow::Result<bool> {
+        for (_, mcu) in &self.mcus {
+            if !mcu.borrow_mut().alive()? {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+}
+
 impl FromConfig for CoreXYRuntime {
     type ConfigType = (
         CoreXYKinematics,
@@ -25,7 +37,7 @@ impl FromConfig for CoreXYRuntime {
         HashMap<String, Rc<RefCell<dyn MCU>>>,
     );
 
-    fn from_config((config, mut axes, mut mcus): Self::ConfigType) -> anyhow::Result<Self>
+    fn from_config((config, mut axes, mcus): Self::ConfigType) -> anyhow::Result<Self>
     where
         Self: Sized,
     {
@@ -42,9 +54,7 @@ impl FromConfig for CoreXYRuntime {
                 .ok_or(anyhow!("Could not find axis by name of {axis_name}"))?;
 
             let axis = match axis_config {
-                AxisConfig::Dummy => {
-                    Box::new(DummyAxis::from_config(axis_config)?) as Box<dyn Axis>
-                }
+                AxisConfig::Dummy(dummy_axis_config) => DummyAxis::new(dummy_axis_config),
 
                 _ => todo!(),
             };

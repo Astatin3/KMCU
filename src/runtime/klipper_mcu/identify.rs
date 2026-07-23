@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use crate::{
-    runtime::klipper_mcu::MCU,
+    runtime::klipper_mcu::KlipperMCU,
     wire::types::{
         command::CommandFilled,
         dictionary::{CommandOutline, Dictionary},
@@ -62,7 +62,7 @@ impl IdentifyResults {
 
 const IDENTIFY_COUNT: usize = 40;
 
-impl<C: Connection> MCU<C> {
+impl<C: Connection> KlipperMCU<C> {
     /// Reads the identify table from the MCU, decompresses it, and parses the JSON.
     pub fn identify(&mut self) -> anyhow::Result<IdentifyResults> {
         let mut i = 0;

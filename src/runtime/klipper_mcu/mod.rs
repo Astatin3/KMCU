@@ -1,5 +1,5 @@
 use crate::{
-    traits::connection::Connection,
+    traits::{connection::Connection, mcu::MCU},
     wire::types::{
         command::CommandFilled,
         dictionary::{DEFAULT_DICT, Dictionary},
@@ -8,8 +8,9 @@ use crate::{
 };
 
 pub mod identify;
+mod mcu;
 
-pub struct MCU<C: Connection> {
+pub struct KlipperMCU<C: Connection> {
     connection: C,
     seq: usize,
 
@@ -20,7 +21,7 @@ pub struct MCU<C: Connection> {
     output: Dictionary, // Currently not used
 }
 
-impl<C: Connection> MCU<C> {
+impl<C: Connection> KlipperMCU<C> {
     pub fn new(connection: C) -> anyhow::Result<Self> {
         let mut this = Self {
             connection,

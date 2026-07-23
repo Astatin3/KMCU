@@ -10,7 +10,7 @@ pub enum AxisConfig {
     #[serde(rename = "a4988")]
     A4988(A4988Config),
     #[serde(rename = "dummy")]
-    Dummy,
+    Dummy(DummyAxisConfig),
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,4 +34,20 @@ pub struct A4988Config {
 
     #[serde(flatten)]
     config: GeneralAxisConfig,
+}
+
+fn dummy_step_amount_mm() -> f32 {
+    0.1
+}
+fn dummy_limits_mm() -> (f32, f32) {
+    (0., 256.)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DummyAxisConfig {
+    #[serde(default = "dummy_step_amount_mm")]
+    pub step_amount_mm: f32,
+
+    #[serde(default = "dummy_limits_mm")]
+    pub limits_mm: (f32, f32),
 }

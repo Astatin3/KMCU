@@ -11,7 +11,9 @@ pub struct PrinterRuntime {
 }
 
 impl PrinterRuntime {
-    // pub fn print(Iter)
+    pub fn alive(&self) -> anyhow::Result<bool> {
+        self.kinematics.alive()
+    }
 }
 
 impl FromConfig for PrinterRuntime {
@@ -43,6 +45,8 @@ impl FromConfig for PrinterRuntime {
                 CoreXYRuntime::from_config((core_xykinematics, config.axis, mcus))?
             }
         };
+
+        info!("Initialized printer runtime");
 
         Ok(Self { kinematics })
     }
