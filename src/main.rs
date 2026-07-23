@@ -1,10 +1,10 @@
 #[macro_use]
 extern crate log;
 
-use std::env::args;
+use std::{env::args, fs::File};
 
 use crate::{
-    config::PrinterConfig, runtime::printer_runtime::PrinterRuntime,
+    config::PrinterConfig, gcode::GcodeIter, runtime::printer_runtime::PrinterRuntime,
     traits::from_config::FromConfig,
 };
 
@@ -36,15 +36,23 @@ fn main() {
 }
 
 fn run() -> anyhow::Result<()> {
-    let config = PrinterConfig::parse(include_str!("../kmcu.toml"))?;
+    // let config = PrinterConfig::parse(include_str!("../kmcu.toml"))?;
 
-    let printer = PrinterRuntime::from_config(config)?;
+    // let printer = PrinterRuntime::from_config(config)?;
 
-    info!("Is alive: {}", printer.alive()?);
+    // info!("Is alive: {}", printer.alive()?);
 
-    // printer.run
+    let file = args().nth(1).ok_or(anyhow::anyhow!("Must specify file!"))?;
 
-    // info!("Read config: {config:?}");
+    let file = File::open(file)?;
+
+    let gcode = GcodeIter::from_file(file);
+
+    let _: Vec<()> = gcode
+        .map(|code| {
+            println!("Code: {code:?}");
+        })
+        .collect();
 
     Ok(())
 }
