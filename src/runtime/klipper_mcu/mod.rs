@@ -1,20 +1,17 @@
-use std::io::{Read, Write};
-use std::os::unix::process::CommandExt;
-use std::process::Command;
 use std::thread::sleep;
-use std::time::Duration;
 
 use anyhow::anyhow;
-use serde_json::json;
 
 use crate::connections::gpio::GPIO;
+use crate::runtime::klipper_mcu::identify::IdentifyResults;
 use crate::{
     config::{self, KlipperMCU},
     connections::{Stream, rpmsg, socket::Socket},
-    traits::{binary::Binary, from_config::FromConfig, mcu::MCU},
+    traits::from_config::FromConfig,
 };
 
 pub mod identify;
+mod io;
 mod mcu;
 
 pub mod protocol {
@@ -24,75 +21,15 @@ pub mod protocol {
     pub mod vlq;
 }
 
-use protocol::{
-    command::CommandFilled,
-    dictionary::{DEFAULT_DICT, Dictionary},
-    message::Frame,
-};
+use protocol::dictionary::Dictionary;
 
 pub struct KlipperMCURuntime {
-    stream: Box<dyn Stream>,
-    seq: usize,
+    pub stream: Box<dyn Stream>,
+    pub seq: usize,
 
-    commands: Dictionary,
-    responses: Dictionary,
+    pub power_pin: Option<GPIO>,
 
-    power_pin: Option<GPIO>,
-
-    #[allow(dead_code)]
-    output: Dictionary,
-}
-
-impl KlipperMCURuntime {
-    fn send_command(&mut self, command: &CommandFilled) -> anyhow::Result<()> {
-        let mut payload = Vec::with_capacity(64);
-        command.encode(&mut payload, self.commands.clone())?;
-
-        let seq = (self.seq % 16) as u8;
-        let frame = Frame::new(&payload, seq).ok_or_else(|| anyhow!("Message too large"))?;
-
-        trace!("Sent command {command:?}");
-
-        frame
-            .write_to(&mut *self.stream)
-            .map_err(|e| anyhow!("Failed to send: {e}"))
-    }
-
-    fn recv_frame(&mut self) -> anyhow::Result<Frame> {
-        let frame = Frame::read_from(&mut *self.stream)?;
-        self.seq = frame.seq() as usize;
-        Ok(frame)
-    }
-
-    fn recv_command(&mut self) -> anyhow::Result<CommandFilled> {
-        let frame = self.recv_frame()?;
-
-        if frame.is_empty() {
-            anyhow::bail!("Received empty frame (ACK/NAK)");
-        }
-
-        let mut cursor = frame.payload();
-        let cmd = CommandFilled::decode(&mut cursor, self.responses.clone())?;
-
-        trace!("Received command {cmd:?}");
-
-        Ok(cmd)
-    }
-
-    fn recv_frame_or_ack(&mut self) -> anyhow::Result<Option<CommandFilled>> {
-        let frame = self.recv_frame()?;
-
-        if frame.is_empty() {
-            return Ok(None);
-        }
-
-        let mut cursor = frame.payload();
-        let cmd = CommandFilled::decode(&mut cursor, self.responses.clone())?;
-
-        trace!("Received command {cmd:?}");
-
-        Ok(Some(cmd))
-    }
+    pub identity: IdentifyResults,
 }
 
 impl FromConfig for KlipperMCURuntime {
@@ -103,7 +40,11 @@ impl FromConfig for KlipperMCURuntime {
         Self: Sized,
     {
         if let Some(command) = config.exec_start {
-            match Command::new("/bin/sh").arg("-c").arg(&command).output() {
+            match std::process::Command::new("/bin/sh")
+                .arg("-c")
+                .arg(&command)
+                .output()
+            {
                 Ok(o) => {
                     if o.status.success() {
                         info!("Ran command '{command}'")
@@ -115,17 +56,14 @@ impl FromConfig for KlipperMCURuntime {
             }
         }
 
-        // If there's a power pin configured
         let power_pin = if let Some(pin_str) = config.power_pin {
             let gpio = GPIO::new(&pin_str, false)?;
             gpio.set(true);
-
             Some(gpio)
         } else {
             None
         };
 
-        // Sleep the configured start delay
         sleep(config.start_delay);
 
         let stream: Box<dyn Stream> = match config.connection {
@@ -142,14 +80,12 @@ impl FromConfig for KlipperMCURuntime {
         let mut this = Self {
             stream,
             seq: 0,
-            commands: DEFAULT_DICT.clone(),
-            responses: DEFAULT_DICT.clone(),
-            output: DEFAULT_DICT.clone(),
-
             power_pin,
+            identity: IdentifyResults::empty(),
         };
 
-        let results = this
+        // Run the identify sequence
+        this.identity = this
             .identify()
             .map_err(|e| anyhow!("Failed identification: {e}"))?;
 

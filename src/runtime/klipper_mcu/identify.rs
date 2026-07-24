@@ -5,12 +5,15 @@ use serde::Deserialize;
 use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
     protocol::{
-        command::CommandFilled,
-        dictionary::{CommandOutline, Dictionary},
+        command::{RecvCommand, SendCommand},
+        dictionary::Dictionary,
     },
 };
 
-#[derive(Debug, Deserialize)]
+pub const MAX_DYNAMIC_ID: usize = 173;
+pub const MAX_STATIC_ID: usize = 108;
+
+#[derive(Deserialize)]
 pub struct IdentifyResults {
     pub app: String,
     pub version: String,
@@ -19,12 +22,27 @@ pub struct IdentifyResults {
     pub config: HashMap<String, serde_json::Value>,
     pub enumerations: HashMap<String, HashMap<String, serde_json::Value>>,
 
-    pub commands: HashMap<String, i16>,
-    pub responses: HashMap<String, i16>,
-    pub output: HashMap<String, i16>,
+    #[serde(deserialize_with = "Dictionary::deserialize_send_command")]
+    pub commands: Dictionary<MAX_DYNAMIC_ID, MAX_STATIC_ID>,
+    #[serde(deserialize_with = "Dictionary::deserialize_recv_command")]
+    pub responses: Dictionary<MAX_DYNAMIC_ID, MAX_STATIC_ID>,
 }
 
 impl IdentifyResults {
+    pub fn empty() -> Self {
+        Self {
+            app: String::new(),
+            version: String::new(),
+            build_versions: String::new(),
+            license: String::new(),
+            config: HashMap::new(),
+            enumerations: HashMap::new(),
+
+            commands: Dictionary::default_dict(),
+            responses: Dictionary::default_dict(),
+        }
+    }
+
     pub fn from_zlib_bytes(zlib_bytes: &[u8]) -> anyhow::Result<Self> {
         let mut z = flate2::read::ZlibDecoder::new(zlib_bytes);
         let mut s = String::new();
@@ -35,73 +53,45 @@ impl IdentifyResults {
         let results: Self = serde_json::from_str(&s)?;
         Ok(results)
     }
-
-    pub fn build_dictionaries(&self) -> anyhow::Result<(Dictionary, Dictionary, Dictionary)> {
-        let command_outlines = self.build_outlines(&self.commands)?;
-        let response_outlines = self.build_outlines(&self.responses)?;
-        let output_outlines = self.build_outlines(&self.output)?;
-
-        Ok((
-            Dictionary::from_vec_commands(command_outlines),
-            Dictionary::from_vec_commands(response_outlines),
-            Dictionary::from_vec_commands(output_outlines),
-        ))
-    }
-
-    fn build_outlines(
-        &self,
-        messages: &HashMap<String, i16>,
-    ) -> anyhow::Result<Vec<CommandOutline>> {
-        messages
-            .iter()
-            .map(|(format, id)| {
-                CommandOutline::from_descriptor(format, *id)
-                    .ok_or_else(|| anyhow::anyhow!("Invalid command descriptor: {format}"))
-            })
-            .collect()
-    }
 }
 
 const IDENTIFY_COUNT: usize = 40;
 
 impl KlipperMCURuntime {
-    /// Reads the identify table from the MCU, decompresses it, and parses the JSON.
+    /// Reads the identify table from the MCU, decompresses it, and parses the
+    /// JSON to produce `IdentifyResults` (including populated command/response
+    /// dictionaries).
     pub fn identify(&mut self) -> anyhow::Result<IdentifyResults> {
-        // while let Ok(_) = self.recv_frame() {}
-
         let mut i = 0;
         let mut zlib_bytes = Vec::new();
 
         loop {
             let byte_start = (i * IDENTIFY_COUNT) as u32;
 
-            self.send_command(&CommandFilled::new(
-                "identify",
-                serde_json::json!({
-                    "offset": byte_start,
-                    "count": IDENTIFY_COUNT,
-                }),
-            ))?;
+            self.send_command(&SendCommand::identify {
+                offset: byte_start,
+                count: IDENTIFY_COUNT as u8,
+            })?;
 
             let cmd = self.recv_frame_or_ack()?;
 
-            // If the command is null, continue
-            let cmd = match cmd {
-                Some(cmd) => cmd,
-                None => {
-                    trace!("Skipped blank command");
+            match cmd {
+                Some(RecvCommand::identify_response { offset, data }) => {
+                    // If the MCU returned no new data, assume that's the end
+                    if data.is_empty() {
+                        break;
+                    }
+
+                    zlib_bytes.extend_from_slice(&data);
+                    i += 1;
+                }
+
+                // the command isn't what is expected, skip it
+                _ => {
+                    trace!("Skipped command");
                     continue;
                 }
             };
-
-            let mut cmd = cmd;
-            let buf = cmd.take_buffer("data").unwrap_or_default();
-            if buf.is_empty() {
-                break;
-            }
-            zlib_bytes.extend_from_slice(&buf);
-
-            i += 1;
         }
 
         IdentifyResults::from_zlib_bytes(&zlib_bytes)
