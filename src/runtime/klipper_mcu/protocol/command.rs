@@ -18,11 +18,11 @@ macro_rules! command {
             ),*
         }
 
-        impl<const S: usize, const D: usize> Binary for $ename {
-            type EncodeArg = Dictionary<S, D>;
-            type DecodeArg = Dictionary<S, D>;
+        impl Binary for $ename {
+            type EncodeArg = Dictionary;
+            type DecodeArg = Dictionary;
 
-            fn encode(&self, writer: &mut dyn std::io::Write, dict: &Dictionary<S, D>) -> anyhow::Result<()> {
+            fn encode(&self, writer: &mut dyn std::io::Write, dict: &Dictionary) -> anyhow::Result<()> {
                 match self {
                     $(
                         $ename::$vname $( { $($fname),* } )? => {
@@ -42,7 +42,7 @@ macro_rules! command {
                 }
             }
 
-            fn decode(reader: &mut dyn std::io::Read, dict: &Dictionary<S, D>) -> anyhow::Result<Self> {
+            fn decode(reader: &mut dyn std::io::Read, dict: &Dictionary) -> anyhow::Result<Self> {
                 // Read the id
                 let id = <i16 as Binary>::decode(reader, &())?;
 

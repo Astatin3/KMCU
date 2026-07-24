@@ -10,9 +10,6 @@ use crate::runtime::klipper_mcu::{
     },
 };
 
-pub const MAX_DYNAMIC_ID: usize = 173;
-pub const MAX_STATIC_ID: usize = 108;
-
 #[derive(Deserialize)]
 pub struct IdentifyResults {
     pub app: String,
@@ -23,9 +20,9 @@ pub struct IdentifyResults {
     pub enumerations: HashMap<String, HashMap<String, serde_json::Value>>,
 
     #[serde(deserialize_with = "Dictionary::deserialize_send_command")]
-    pub commands: Dictionary<MAX_DYNAMIC_ID, MAX_STATIC_ID>,
+    pub commands: Dictionary,
     #[serde(deserialize_with = "Dictionary::deserialize_recv_command")]
-    pub responses: Dictionary<MAX_DYNAMIC_ID, MAX_STATIC_ID>,
+    pub responses: Dictionary,
 }
 
 impl IdentifyResults {

@@ -4,26 +4,29 @@ use serde::{Deserialize, Deserializer, de::Error};
 
 use crate::runtime::klipper_mcu::protocol::command::{RecvCommand, SendCommand};
 
+pub const MAX_DYNAMIC_ID: usize = 173;
+pub const MAX_STATIC_ID: usize = 108;
+
 const DYNAMIC_ID_OFFSET: i16 = 32;
 
 /// A map from static ids of commands (the local ones that don't change) to
 /// the ids returned by the Klipper MCU
 #[derive(Clone)]
-pub struct Dictionary<const S: usize, const D: usize> {
+pub struct Dictionary {
     // A map from the static id range to dynamic ids
-    from_static_id: [i16; D],
+    from_static_id: [i16; MAX_DYNAMIC_ID],
 
     // A map from the dynamic id range, to static ids
     // indices are offset by DYNAMIC_ID_OFFSET in order to
     // account for negative ids.
-    to_static_id: [u16; S],
+    to_static_id: [u16; MAX_STATIC_ID],
 }
 
-impl<const S: usize, const D: usize> Dictionary<S, D> {
+impl Dictionary {
     pub fn new() -> Self {
         Self {
-            from_static_id: [i16::MAX; D],
-            to_static_id: [u16::MAX; S],
+            from_static_id: [i16::MAX; MAX_DYNAMIC_ID],
+            to_static_id: [u16::MAX; MAX_STATIC_ID],
         }
     }
 
@@ -42,7 +45,7 @@ impl<const S: usize, const D: usize> Dictionary<S, D> {
         // Offset the dynamic id so it fits within a smaller range
         let dynamic_id_index = (dynamic_id + DYNAMIC_ID_OFFSET) as usize;
 
-        if dynamic_id_index >= D {
+        if dynamic_id_index >= MAX_DYNAMIC_ID {
             return None;
         }
 
@@ -54,7 +57,7 @@ impl<const S: usize, const D: usize> Dictionary<S, D> {
     pub fn get_dynamic_id(&self, static_id: u16) -> Option<i16> {
         let static_id = static_id as usize;
 
-        if static_id >= S {
+        if static_id >= MAX_STATIC_ID {
             return None;
         }
 
@@ -64,7 +67,7 @@ impl<const S: usize, const D: usize> Dictionary<S, D> {
     }
 
     pub fn add_definition(&mut self, static_id: u16, dynamic_id: i16) {
-        if static_id as usize >= S {
+        if static_id as usize >= MAX_DYNAMIC_ID {
             unreachable!()
         }
 
@@ -75,7 +78,7 @@ impl<const S: usize, const D: usize> Dictionary<S, D> {
     fn deserialize_with<'de, De: Deserializer<'de>>(
         deserializer: De,
         id_for_name: &dyn Fn(&str) -> u16,
-    ) -> Result<Dictionary<S, D>, De::Error> {
+    ) -> Result<Dictionary, De::Error> {
         let mut dict = Dictionary::new();
 
         let map: HashMap<String, i16> = HashMap::deserialize(deserializer)?;
@@ -100,13 +103,13 @@ impl<const S: usize, const D: usize> Dictionary<S, D> {
 
     pub fn deserialize_send_command<'de, De: Deserializer<'de>>(
         deserializer: De,
-    ) -> Result<Dictionary<S, D>, De::Error> {
+    ) -> Result<Dictionary, De::Error> {
         Self::deserialize_with(deserializer, &SendCommand::id_for_name)
     }
 
     pub fn deserialize_recv_command<'de, De: Deserializer<'de>>(
         deserializer: De,
-    ) -> Result<Dictionary<S, D>, De::Error> {
+    ) -> Result<Dictionary, De::Error> {
         Self::deserialize_with(deserializer, &RecvCommand::id_for_name)
     }
 }
