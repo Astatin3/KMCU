@@ -6,7 +6,7 @@ use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
     protocol::{
         command::{RecvCommand, SendCommand},
-        dictionary::Dictionary,
+        dictionary::{DictionaryRecv, DictionarySend},
     },
 };
 
@@ -19,10 +19,8 @@ pub struct IdentifyResults {
     pub config: HashMap<String, serde_json::Value>,
     pub enumerations: HashMap<String, HashMap<String, serde_json::Value>>,
 
-    #[serde(deserialize_with = "Dictionary::deserialize_send_command")]
-    pub commands: Dictionary,
-    #[serde(deserialize_with = "Dictionary::deserialize_recv_command")]
-    pub responses: Dictionary,
+    pub commands: DictionarySend,
+    pub responses: DictionaryRecv,
 }
 
 impl IdentifyResults {
@@ -35,8 +33,8 @@ impl IdentifyResults {
             config: HashMap::new(),
             enumerations: HashMap::new(),
 
-            commands: Dictionary::default_dict(),
-            responses: Dictionary::default_dict(),
+            commands: DictionarySend::default_dict(),
+            responses: DictionaryRecv::default_dict(),
         }
     }
 

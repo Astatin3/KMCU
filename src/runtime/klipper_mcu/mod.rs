@@ -21,7 +21,7 @@ pub mod protocol {
     pub mod vlq;
 }
 
-use protocol::dictionary::Dictionary;
+use protocol::dictionary::DictionarySend;
 
 pub struct KlipperMCURuntime {
     pub stream: Box<dyn Stream>,

@@ -1,4 +1,7 @@
-use crate::{runtime::klipper_mcu::protocol::dictionary::Dictionary, traits::binary::Binary};
+use crate::{
+    runtime::klipper_mcu::protocol::dictionary::{DictionaryRecv, DictionarySend},
+    traits::binary::Binary,
+};
 
 macro_rules! command {
     (
@@ -19,10 +22,10 @@ macro_rules! command {
         }
 
         impl Binary for $ename {
-            type EncodeArg = Dictionary;
-            type DecodeArg = Dictionary;
+            type EncodeArg = DictionarySend;
+            type DecodeArg = DictionaryRecv;
 
-            fn encode(&self, writer: &mut dyn std::io::Write, dict: &Dictionary) -> anyhow::Result<()> {
+            fn encode(&self, writer: &mut dyn std::io::Write, dict: &DictionarySend) -> anyhow::Result<()> {
                 match self {
                     $(
                         $ename::$vname $( { $($fname),* } )? => {
@@ -42,7 +45,7 @@ macro_rules! command {
                 }
             }
 
-            fn decode(reader: &mut dyn std::io::Read, dict: &Dictionary) -> anyhow::Result<Self> {
+            fn decode(reader: &mut dyn std::io::Read, dict: &DictionaryRecv) -> anyhow::Result<Self> {
                 // Read the id
                 let id = <i16 as Binary>::decode(reader, &())?;
 
@@ -73,13 +76,13 @@ macro_rules! command {
 
         impl $ename {
             /// Look up the wire id for a variant by its Rust name.
-            pub fn id_for_name(name: &str) -> u16 {
+            pub fn id_for_name(name: &str) -> u8 {
                 $(
                     if name == stringify!($vname) {
                         return $id;
                     }
                 )*
-                u16::MAX
+                u8::MAX
             }
         }
     };

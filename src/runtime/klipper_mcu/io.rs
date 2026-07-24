@@ -2,7 +2,6 @@ use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
     protocol::{
         command::{RecvCommand, SendCommand},
-        dictionary::Dictionary,
         message::Frame,
     },
 };
