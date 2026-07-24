@@ -39,21 +39,22 @@ impl Binary for CommandFilled {
     type EncodeArg = Dictionary;
     type DecodeArg = Dictionary;
 
-    fn encode(&self, writer: &mut dyn Write, dict: Dictionary) {
+    fn encode(&self, writer: &mut dyn Write, dict: Dictionary) -> anyhow::Result<()> {
         let outline = dict
             .get_outline_by_name(&self.name)
-            .expect(&format!("Unknown command name '{}'", self.name));
+            .ok_or_else(|| anyhow!("Unknown command name '{}'", self.name))?;
 
-        vlq::encode_msgid_to(outline.id, writer);
+        vlq::encode_msgid_to(outline.id, writer)?;
 
         for (param_name, arg_type) in &outline.parameters {
             let value = self
                 .args
                 .get(param_name.as_str())
-                .expect("Missing parameter");
+                .ok_or_else(|| anyhow!("Missing parameter '{param_name}'"))?;
 
-            encode_value(value, arg_type, writer);
+            encode_value(value, arg_type, writer)?;
         }
+        Ok(())
     }
 
     fn decode(reader: &mut dyn Read, dict: Dictionary) -> anyhow::Result<Self> {
@@ -75,34 +76,35 @@ impl Binary for CommandFilled {
     }
 }
 
-fn encode_value(value: &Value, arg_type: &ArgType, writer: &mut dyn Write) {
+fn encode_value(value: &Value, arg_type: &ArgType, writer: &mut dyn Write) -> anyhow::Result<()> {
     match arg_type {
         ArgType::Uint32 => {
-            vlq::encode_int_to(value.as_u64().unwrap() as u32, writer);
+            vlq::encode_int_to(value.as_u64().ok_or_else(|| anyhow!("Expected u32"))? as u32, writer)?;
         }
         ArgType::Int32 => {
-            vlq::encode_int_to(value.as_i64().unwrap() as u32, writer);
+            vlq::encode_int_to(value.as_i64().ok_or_else(|| anyhow!("Expected i32"))? as u32, writer)?;
         }
         ArgType::Uint16 => {
-            vlq::encode_int_to(value.as_u64().unwrap() as u32, writer);
+            vlq::encode_int_to(value.as_u64().ok_or_else(|| anyhow!("Expected u16"))? as u32, writer)?;
         }
         ArgType::Int16 => {
-            vlq::encode_int_to(value.as_i64().unwrap() as u32, writer);
+            vlq::encode_int_to(value.as_i64().ok_or_else(|| anyhow!("Expected i16"))? as u32, writer)?;
         }
         ArgType::Byte => {
-            writer.write_all(&[value.as_u64().unwrap() as u8]).unwrap();
+            writer.write_all(&[value.as_u64().ok_or_else(|| anyhow!("Expected byte"))? as u8])?;
         }
         ArgType::String => {
-            let s = value.as_str().unwrap();
-            writer.write_all(&[s.len() as u8]).unwrap();
-            writer.write_all(s.as_bytes()).unwrap();
+            let s = value.as_str().ok_or_else(|| anyhow!("Expected string"))?;
+            writer.write_all(&[s.len() as u8])?;
+            writer.write_all(s.as_bytes())?;
         }
         ArgType::ProgmemBuffer | ArgType::Buffer => {
             let bytes = value_to_bytes(value);
-            writer.write_all(&[bytes.len() as u8]).unwrap();
-            writer.write_all(&bytes).unwrap();
+            writer.write_all(&[bytes.len() as u8])?;
+            writer.write_all(&bytes)?;
         }
     }
+    Ok(())
 }
 
 fn decode_value(reader: &mut dyn Read, arg_type: &ArgType) -> anyhow::Result<Value> {

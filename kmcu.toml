@@ -18,13 +18,15 @@ axis_z = ["mainboard", "stepper_z"]
 axis_extruder = ["toolhead", "stepper_extruder"]
 
 [mcu.mainboard]
-type = "sim"
-# connection = { type = "rpmsg", channel_name = "cpu_dsp0" }
+type = "klipper"
+connection = { type = "rpmsg", channel_name = "cpu_dsp0" }
 
 [mcu.toolhead]
 type = "klipper"
 
 power_pin = "PE17"
+start_delay = 500 # Wait for the printer to start after power on
+
 connection = {
     type = "serial",
     path = "/dev/ttyS3",

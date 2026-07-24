@@ -5,7 +5,7 @@ use std::{thread::sleep, time::Duration};
 use anyhow::anyhow;
 
 const GPIO_PREFIX: &str = "/sys/class/gpio";
-const DELAY: Duration = Duration::from_millis(10);
+// const DELAY: Duration = Duration::from_millis(10);
 
 fn pin_name_to_int(pin_name: &str) -> Option<u32> {
     let first_byte = pin_name.as_bytes()[1];
@@ -23,6 +23,7 @@ fn pin_name_to_int(pin_name: &str) -> Option<u32> {
 
 // Equivalent to 'echo <string> > <filename>'
 fn write_to_file(path: String, data: &str) -> anyhow::Result<()> {
+    trace!("Wrote '{data}' to '{path}'");
     std::fs::write(&path, data).map_err(|e| anyhow!("Failed to write '{data}' to '{path}': {e}"))
 }
 
@@ -54,12 +55,11 @@ pub struct GPIO {
     pin_str: String,
     pin_int: u32,
 
-    direction: bool,
     invert: bool,
 }
 
 impl GPIO {
-    pub fn new(pin_str: &str, direction: bool, invert: bool) -> anyhow::Result<Self> {
+    pub fn new(pin_str: &str, invert: bool) -> anyhow::Result<Self> {
         let pin_int = pin_name_to_int(pin_str).ok_or(anyhow!("Invalid GPIO Pin: '{pin_str}'"))?;
         let pin_str = pin_str.to_string();
 
@@ -67,19 +67,20 @@ impl GPIO {
         // return an error because if already exported
         let _ = set_pin_export(pin_int, true);
 
-        // The kernel takes a sec to set the pin to export
-        sleep(DELAY);
+        // // The kernel takes a sec to set the pin to export
+        // sleep(DELAY);
 
-        set_pin_direction(pin_int, direction)?;
+        // Set the value to out
+        set_pin_direction(pin_int, false)?;
 
-        set_pin_value(pin_int, invert)?;
+        // Set to the default value
+        // set_pin_value(pin_int, invert)?;
 
         debug!("Initialized GPIO pin '{pin_str}'");
 
         Ok(Self {
             pin_str,
             pin_int,
-            direction,
             invert,
         })
     }
@@ -92,7 +93,8 @@ impl GPIO {
 
 impl Drop for GPIO {
     fn drop(&mut self) {
-        let _ = set_pin_value(self.pin_int, !self.invert);
+        debug!("Dropping pin '{}'", self.pin_str);
+        let _ = set_pin_value(self.pin_int, self.invert);
         let _ = set_pin_export(self.pin_int, false);
     }
 }

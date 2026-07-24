@@ -7,9 +7,12 @@ use crate::{
 
 impl MCU for KlipperMCURuntime {
     fn alive(&mut self) -> anyhow::Result<()> {
-        self.send_command(&CommandFilled::new("debug_ping", json!({"data": []})))?;
+        self.send_command(&CommandFilled::new(
+            "identify",
+            json!({ "offset": 0u32, "count": 0u8 }),
+        ))?;
 
-        let _ = self.recv_command()?;
+        self.recv_frame()?;
 
         Ok(())
     }

@@ -40,6 +40,8 @@ impl FromConfig for PrinterRuntime {
                 )) as Rc<RefCell<dyn MCU>>,
             };
 
+            info!("Initialized runtime '{name}'");
+
             mcus.insert(name, mcu);
         }
 

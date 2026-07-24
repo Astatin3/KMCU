@@ -4,7 +4,7 @@ pub trait Binary: Sized {
     type EncodeArg;
     type DecodeArg;
 
-    fn encode(&self, writer: &mut dyn Write, arg: Self::EncodeArg);
+    fn encode(&self, writer: &mut dyn Write, arg: Self::EncodeArg) -> anyhow::Result<()>;
     fn decode(reader: &mut dyn Read, arg: Self::DecodeArg) -> anyhow::Result<Self>;
 }
 
@@ -14,8 +14,8 @@ macro_rules! binary_vlq_unsigned {
             type EncodeArg = ();
             type DecodeArg = ();
 
-            fn encode(&self, writer: &mut dyn Write, _: ()) {
-                crate::runtime::klipper_mcu::protocol::vlq::encode_int_to(*self as u32, writer);
+            fn encode(&self, writer: &mut dyn Write, _: ()) -> anyhow::Result<()> {
+                crate::runtime::klipper_mcu::protocol::vlq::encode_int_to(*self as u32, writer)
             }
 
             fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
@@ -32,8 +32,8 @@ macro_rules! binary_vlq_signed {
             type EncodeArg = ();
             type DecodeArg = ();
 
-            fn encode(&self, writer: &mut dyn Write, _: ()) {
-                crate::runtime::klipper_mcu::protocol::vlq::encode_int_to(*self as u32, writer);
+            fn encode(&self, writer: &mut dyn Write, _: ()) -> anyhow::Result<()> {
+                crate::runtime::klipper_mcu::protocol::vlq::encode_int_to(*self as u32, writer)
             }
 
             fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
@@ -55,10 +55,11 @@ impl<T: Binary<EncodeArg = ()>> Binary for Vec<T> {
     type EncodeArg = ();
     type DecodeArg = ();
 
-    fn encode(&self, writer: &mut dyn Write, _: ()) {
+    fn encode(&self, writer: &mut dyn Write, _: ()) -> anyhow::Result<()> {
         for item in self {
-            item.encode(writer, ());
+            item.encode(writer, ())?;
         }
+        Ok(())
     }
 
     fn decode(_: &mut dyn Read, _: ()) -> anyhow::Result<Self> {

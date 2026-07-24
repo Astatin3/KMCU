@@ -17,7 +17,7 @@ pub enum ArgType {
 #[derive(Clone)]
 pub struct CommandOutline {
     pub name: String,
-    pub id: u16,
+    pub id: i16,
     pub parameters: Vec<(String, ArgType)>,
 }
 
@@ -25,8 +25,8 @@ pub struct CommandOutline {
 /// commands sent over by Klipper
 #[derive(Clone)]
 pub struct Dictionary {
-    commands: HashMap<u16, CommandOutline>,
-    command_names: HashMap<String, u16>,
+    commands: HashMap<i16, CommandOutline>,
+    command_names: HashMap<String, i16>,
 }
 
 /// The default dictionary used for initialization
@@ -38,7 +38,7 @@ pub static DEFAULT_DICT: Dictionary = Dictionary::from_vec(vec![
 .unwrap();
 
 impl Dictionary {
-    pub fn from_vec(command_descriptors: Vec<(&str, u16)>) -> Option<Self> {
+    pub fn from_vec(command_descriptors: Vec<(&str, i16)>) -> Option<Self> {
         let mut commands = Vec::with_capacity(command_descriptors.len());
         for (str, id) in command_descriptors {
             commands.push(CommandOutline::from_descriptor(str, id)?);
@@ -47,7 +47,7 @@ impl Dictionary {
     }
 
     pub fn from_vec_commands(commands: Vec<CommandOutline>) -> Self {
-        let (command_names, commands): (HashMap<String, u16>, HashMap<u16, CommandOutline>) =
+        let (command_names, commands): (HashMap<String, i16>, HashMap<i16, CommandOutline>) =
             commands
                 .into_iter()
                 .map(|command| ((command.name.clone(), command.id), (command.id, command)))
@@ -83,7 +83,7 @@ impl Dictionary {
 }
 
 impl Dictionary {
-    pub fn get_outline(&self, id: u16) -> Option<&CommandOutline> {
+    pub fn get_outline(&self, id: i16) -> Option<&CommandOutline> {
         self.commands.get(&id)
     }
 
@@ -106,7 +106,7 @@ impl CommandOutline {
     /// Supports two formats:
     /// - Named: `"name key=%type key=%type"` (commands, responses)
     /// - Printf: `"text %type text %type"` (output messages, unnamed params auto-named arg0, arg1, ...)
-    pub fn from_descriptor(descriptor: &str, id: u16) -> Option<Self> {
+    pub fn from_descriptor(descriptor: &str, id: i16) -> Option<Self> {
         let first_token = descriptor.split(' ').next()?;
         if !first_token.contains('=')
             && let Some(outline) = Self::from_named_descriptor(descriptor, id)
@@ -117,7 +117,7 @@ impl CommandOutline {
     }
 
     /// Named format: `"name key1=%type1 key2=%type2 ..."`
-    fn from_named_descriptor(descriptor: &str, id: u16) -> Option<Self> {
+    fn from_named_descriptor(descriptor: &str, id: i16) -> Option<Self> {
         let mut split = descriptor.split(' ');
         let name = split.next()?.to_string();
 
@@ -149,7 +149,7 @@ impl CommandOutline {
 
     /// Printf format: scan for `%type` specifiers, auto-generate arg0, arg1, ...
     /// The entire descriptor string is used as the name.
-    fn from_printf_descriptor(descriptor: &str, id: u16) -> Option<Self> {
+    fn from_printf_descriptor(descriptor: &str, id: i16) -> Option<Self> {
         let mut parameters = Vec::new();
         let mut chars = descriptor.chars().peekable();
         let mut arg_idx: u32 = 0;

@@ -28,11 +28,11 @@ pub struct SocketConnection {
 }
 
 fn default_settle() -> Duration {
-    Duration::from_millis(4000)
+    Duration::from_millis(10)
 }
 
 fn default_rpmsg_timeout() -> Duration {
-    Duration::from_millis(10000)
+    Duration::from_millis(100)
 }
 
 #[derive(Debug, Deserialize)]

@@ -19,9 +19,9 @@ pub struct IdentifyResults {
     pub config: HashMap<String, serde_json::Value>,
     pub enumerations: HashMap<String, HashMap<String, serde_json::Value>>,
 
-    pub commands: HashMap<String, u16>,
-    pub responses: HashMap<String, u16>,
-    pub output: HashMap<String, u16>,
+    pub commands: HashMap<String, i16>,
+    pub responses: HashMap<String, i16>,
+    pub output: HashMap<String, i16>,
 }
 
 impl IdentifyResults {
@@ -50,7 +50,7 @@ impl IdentifyResults {
 
     fn build_outlines(
         &self,
-        messages: &HashMap<String, u16>,
+        messages: &HashMap<String, i16>,
     ) -> anyhow::Result<Vec<CommandOutline>> {
         messages
             .iter()
@@ -88,7 +88,10 @@ impl KlipperMCURuntime {
             // If the command is null, continue
             let cmd = match cmd {
                 Some(cmd) => cmd,
-                None => continue,
+                None => {
+                    trace!("Skipped blank command");
+                    continue;
+                }
             };
 
             let mut cmd = cmd;

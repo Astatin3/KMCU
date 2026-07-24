@@ -80,7 +80,9 @@ impl RpmsgEndpoint {
 
     fn connect(&mut self) -> anyhow::Result<()> {
         if !self.config.remoteproc_state_path.is_empty() {
-            if let Err(e) = restart_remoteproc(&self.config.remoteproc_state_path, self.config.settle) {
+            if let Err(e) =
+                restart_remoteproc(&self.config.remoteproc_state_path, self.config.settle)
+            {
                 warn!("Failed to restart DSP via remoteproc: {e}");
             }
         }
@@ -202,7 +204,7 @@ impl Write for RpmsgEndpoint {
                 "RPMSG not connected",
             ));
         }
-                let deadline = Instant::now() + self.config.timeout;
+        let deadline = Instant::now() + self.config.timeout;
         let result = write_with_timeout(self.data_fd.as_mut().unwrap(), buf, deadline);
         match result {
             Ok(n) => Ok(n),
@@ -210,7 +212,7 @@ impl Write for RpmsgEndpoint {
                 warn!("RPMSG write failed ({e}), reconnecting");
                 self.reconnect()
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        let deadline = Instant::now() + self.config.timeout;
+                let deadline = Instant::now() + self.config.timeout;
                 write_with_timeout(self.data_fd.as_mut().unwrap(), buf, deadline)
             }
             Err(e) => Err(e),
@@ -251,7 +253,7 @@ fn wait_for_path(path: &str, timeout: Duration) -> anyhow::Result<()> {
         if Instant::now() >= deadline {
             anyhow::bail!("Timed out waiting for {path}");
         }
-        std::thread::sleep(Duration::from_millis(500));
+        std::thread::sleep(Duration::from_millis(50));
     }
     Ok(())
 }
@@ -431,7 +433,7 @@ fn restart_remoteproc(state_path: &str, settle: Duration) -> anyhow::Result<()> 
     if let Err(e) = fs::write(state_path, "stop") {
         warn!("Failed to write 'stop' to {state_path} (likely already stopped): {e}");
     }
-    std::thread::sleep(Duration::from_secs(1));
+    std::thread::sleep(settle);
 
     fs::write(state_path, "start")
         .map_err(|e| anyhow::anyhow!("Failed to write 'start' to {state_path}: {e}"))?;

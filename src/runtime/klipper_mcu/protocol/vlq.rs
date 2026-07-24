@@ -9,56 +9,49 @@ fn read_byte(reader: &mut dyn Read) -> anyhow::Result<u8> {
 }
 
 /// Encode a 32-bit unsigned integer as a variable length quantity (VLQ) into a writer.
-pub fn encode_int_to(v: u32, writer: &mut dyn Write) {
+pub fn encode_int_to(v: u32, writer: &mut dyn Write) -> anyhow::Result<()> {
     let sv = v as i32;
 
     if sv < (3 << 5) && sv >= -(1 << 5) {
-        writer.write_all(&[(v & 0x7f) as u8]).unwrap();
-        return;
+        writer.write_all(&[(v & 0x7f) as u8])?;
+        return Ok(());
     }
 
     if sv < (3 << 12) && sv >= -(1 << 12) {
-        writer
-            .write_all(&[
-                ((v >> 7) & 0x7f) as u8 | 0x80,
-                (v & 0x7f) as u8,
-            ])
-            .unwrap();
-        return;
+        writer.write_all(&[
+            ((v >> 7) & 0x7f) as u8 | 0x80,
+            (v & 0x7f) as u8,
+        ])?;
+        return Ok(());
     }
 
     if sv < (3 << 19) && sv >= -(1 << 19) {
-        writer
-            .write_all(&[
-                ((v >> 14) & 0x7f) as u8 | 0x80,
-                ((v >> 7) & 0x7f) as u8 | 0x80,
-                (v & 0x7f) as u8,
-            ])
-            .unwrap();
-        return;
+        writer.write_all(&[
+            ((v >> 14) & 0x7f) as u8 | 0x80,
+            ((v >> 7) & 0x7f) as u8 | 0x80,
+            (v & 0x7f) as u8,
+        ])?;
+        return Ok(());
     }
 
     if sv < (3 << 26) && sv >= -(1 << 26) {
-        writer
-            .write_all(&[
-                ((v >> 21) & 0x7f) as u8 | 0x80,
-                ((v >> 14) & 0x7f) as u8 | 0x80,
-                ((v >> 7) & 0x7f) as u8 | 0x80,
-                (v & 0x7f) as u8,
-            ])
-            .unwrap();
-        return;
-    }
-
-    writer
-        .write_all(&[
-            ((v >> 28) & 0x7f) as u8 | 0x80,
+        writer.write_all(&[
             ((v >> 21) & 0x7f) as u8 | 0x80,
             ((v >> 14) & 0x7f) as u8 | 0x80,
             ((v >> 7) & 0x7f) as u8 | 0x80,
             (v & 0x7f) as u8,
-        ])
-        .unwrap();
+        ])?;
+        return Ok(());
+    }
+
+    writer.write_all(&[
+        ((v >> 28) & 0x7f) as u8 | 0x80,
+        ((v >> 21) & 0x7f) as u8 | 0x80,
+        ((v >> 14) & 0x7f) as u8 | 0x80,
+        ((v >> 7) & 0x7f) as u8 | 0x80,
+        (v & 0x7f) as u8,
+    ])?;
+    Ok(())
 }
 
 /// Encode a 32-bit unsigned integer as a variable length quantity (VLQ).
@@ -119,32 +112,31 @@ pub fn parse_int(reader: &mut dyn Read) -> anyhow::Result<u32> {
 }
 
 /// Encode a message ID (up to 16 bits) into a variable-length format in a writer.
-pub fn encode_msgid_to(encoded_msgid: u16, writer: &mut dyn Write) {
-    if encoded_msgid >= 0x80 {
-        writer
-            .write_all(&[((encoded_msgid >> 7) & 0x7f) as u8 | 0x80])
-            .unwrap();
+pub fn encode_msgid_to(encoded_msgid: i16, writer: &mut dyn Write) -> anyhow::Result<()> {
+    let v = encoded_msgid as u16;
+    if v >= 0x80 {
+        writer.write_all(&[((v >> 7) & 0x7f) as u8 | 0x80])?;
     }
-    writer
-        .write_all(&[(encoded_msgid & 0x7f) as u8])
-        .unwrap();
+    writer.write_all(&[(v & 0x7f) as u8])?;
+    Ok(())
 }
 
 /// Encode a message ID (up to 16 bits) into a variable-length format.
 /// Returns a Vec<u8> containing the encoded bytes (1 or 2 bytes).
-pub fn encode_msgid(encoded_msgid: u16) -> Vec<u8> {
+pub fn encode_msgid(encoded_msgid: i16) -> Vec<u8> {
+    let v = encoded_msgid as u16;
     let mut buf = Vec::with_capacity(2);
 
-    if encoded_msgid >= 0x80 {
-        buf.push(((encoded_msgid >> 7) & 0x7f) as u8 | 0x80);
+    if v >= 0x80 {
+        buf.push(((v >> 7) & 0x7f) as u8 | 0x80);
     }
-    buf.push((encoded_msgid & 0x7f) as u8);
+    buf.push((v & 0x7f) as u8);
 
     buf
 }
 
 /// Decode a variable-length encoded message ID from a reader.
-pub fn parse_msgid(reader: &mut dyn Read) -> anyhow::Result<u16> {
+pub fn parse_msgid(reader: &mut dyn Read) -> anyhow::Result<i16> {
     let first = read_byte(reader)?;
     let mut msgid = first as u16;
 
@@ -153,5 +145,5 @@ pub fn parse_msgid(reader: &mut dyn Read) -> anyhow::Result<u16> {
         msgid = ((first as u16 & 0x7f) << 7) | second as u16;
     }
 
-    Ok(msgid)
+    Ok(msgid as i16)
 }

@@ -46,7 +46,7 @@ pub struct KlipperMCURuntime {
 impl KlipperMCURuntime {
     fn send_command(&mut self, command: &CommandFilled) -> anyhow::Result<()> {
         let mut payload = Vec::with_capacity(64);
-        command.encode(&mut payload, self.commands.clone());
+        command.encode(&mut payload, self.commands.clone())?;
 
         let seq = (self.seq % 16) as u8;
         let frame = Frame::new(&payload, seq).ok_or_else(|| anyhow!("Message too large"))?;
@@ -117,7 +117,7 @@ impl FromConfig for KlipperMCURuntime {
 
         // If there's a power pin configured
         let power_pin = if let Some(pin_str) = config.power_pin {
-            let gpio = GPIO::new(&pin_str, false, false)?;
+            let gpio = GPIO::new(&pin_str, false)?;
             gpio.set(true);
 
             Some(gpio)
