@@ -24,6 +24,7 @@ type = "sim"
 [mcu.toolhead]
 type = "klipper"
 
+power_pin = "PE17"
 connection = {
     type = "serial",
     path = "/dev/ttyS3",

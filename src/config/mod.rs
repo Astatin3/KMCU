@@ -11,9 +11,9 @@ pub use kinematics::*;
 pub use mcu::*;
 pub use pin::*;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -30,4 +30,12 @@ impl PrinterConfig {
     pub fn parse(config_string: &str) -> anyhow::Result<Self> {
         Ok(toml::from_str(config_string)?)
     }
+}
+
+pub fn de_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let ms = u64::deserialize(deserializer)?;
+    Ok(Duration::from_millis(ms))
 }

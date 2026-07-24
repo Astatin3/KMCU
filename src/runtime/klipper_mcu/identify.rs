@@ -67,6 +67,8 @@ const IDENTIFY_COUNT: usize = 40;
 impl KlipperMCURuntime {
     /// Reads the identify table from the MCU, decompresses it, and parses the JSON.
     pub fn identify(&mut self) -> anyhow::Result<IdentifyResults> {
+        // while let Ok(_) = self.recv_frame() {}
+
         let mut i = 0;
         let mut zlib_bytes = Vec::new();
 
@@ -81,7 +83,13 @@ impl KlipperMCURuntime {
                 }),
             ))?;
 
-            let cmd = self.recv_command()?;
+            let cmd = self.recv_frame_or_ack()?;
+
+            // If the command is null, continue
+            let cmd = match cmd {
+                Some(cmd) => cmd,
+                None => continue,
+            };
 
             let mut cmd = cmd;
             let buf = cmd.take_buffer("data").unwrap_or_default();

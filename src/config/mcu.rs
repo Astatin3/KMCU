@@ -1,6 +1,8 @@
+use std::time::Duration;
+
 use serde::Deserialize;
 
-use crate::config::connection::Connection;
+use crate::config::{connection::Connection, de_duration};
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -14,6 +16,10 @@ pub enum MCUConfig {
 #[derive(Debug, Deserialize)]
 pub struct SimMCUConfig {}
 
+fn default_start_duration() -> Duration {
+    Duration::ZERO
+}
+
 #[derive(Debug, Deserialize)]
 pub struct KlipperMCU {
     pub connection: Connection,
@@ -23,4 +29,7 @@ pub struct KlipperMCU {
     pub exec_start: Option<String>,
 
     pub power_pin: Option<String>,
+
+    #[serde(default = "default_start_duration", deserialize_with = "de_duration")]
+    pub start_delay: Duration,
 }

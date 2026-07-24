@@ -1,10 +1,13 @@
 use std::io::{Read, Write};
 use std::os::unix::process::CommandExt;
 use std::process::Command;
+use std::thread::sleep;
+use std::time::Duration;
 
 use anyhow::anyhow;
 use serde_json::json;
 
+use crate::connections::gpio::GPIO;
 use crate::{
     config::{self, KlipperMCU},
     connections::{Stream, rpmsg, socket::Socket},
@@ -34,30 +37,13 @@ pub struct KlipperMCURuntime {
     commands: Dictionary,
     responses: Dictionary,
 
+    power_pin: Option<GPIO>,
+
     #[allow(dead_code)]
     output: Dictionary,
 }
 
 impl KlipperMCURuntime {
-    pub fn new(stream: Box<dyn Stream>) -> anyhow::Result<Self> {
-        let mut this = Self {
-            stream,
-            seq: 0,
-            commands: DEFAULT_DICT.clone(),
-            responses: DEFAULT_DICT.clone(),
-            output: DEFAULT_DICT.clone(),
-        };
-
-        let results = this.identify()?;
-
-        let (commands, responses, output) = results.build_dictionaries()?;
-        this.commands = commands;
-        this.responses = responses;
-        this.output = output;
-
-        Ok(this)
-    }
-
     fn send_command(&mut self, command: &CommandFilled) -> anyhow::Result<()> {
         let mut payload = Vec::with_capacity(64);
         command.encode(&mut payload, self.commands.clone());
@@ -129,6 +115,19 @@ impl FromConfig for KlipperMCURuntime {
             }
         }
 
+        // If there's a power pin configured
+        let power_pin = if let Some(pin_str) = config.power_pin {
+            let gpio = GPIO::new(&pin_str, false, false)?;
+            gpio.set(true);
+
+            Some(gpio)
+        } else {
+            None
+        };
+
+        // Sleep the configured start delay
+        sleep(config.start_delay);
+
         let stream: Box<dyn Stream> = match config.connection {
             config::Connection::Serial(conn) | config::Connection::Socket(conn) => Box::new(
                 Socket::from_config(conn)
@@ -140,6 +139,20 @@ impl FromConfig for KlipperMCURuntime {
             ),
         };
 
-        Self::new(stream).map_err(|e| anyhow!("Failed startup: {e}"))
+        let mut this = Self {
+            stream,
+            seq: 0,
+            commands: DEFAULT_DICT.clone(),
+            responses: DEFAULT_DICT.clone(),
+            output: DEFAULT_DICT.clone(),
+
+            power_pin,
+        };
+
+        let results = this
+            .identify()
+            .map_err(|e| anyhow!("Failed identification: {e}"))?;
+
+        Ok(this)
     }
 }

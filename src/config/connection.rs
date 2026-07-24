@@ -1,19 +1,8 @@
+use crate::config::de_duration;
+
 use std::time::Duration;
 
 use serde::Deserialize;
-
-mod de_duration {
-    use serde::{self, Deserialize, Deserializer};
-    use std::time::Duration;
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let ms = u64::deserialize(deserializer)?;
-        Ok(Duration::from_millis(ms))
-    }
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -34,7 +23,7 @@ fn default_timeout() -> Duration {
 pub struct SocketConnection {
     pub path: String,
     pub baud: Option<u32>,
-    #[serde(default = "default_timeout", deserialize_with = "de_duration::deserialize")]
+    #[serde(default = "default_timeout", deserialize_with = "de_duration")]
     pub timeout: Duration,
 }
 
@@ -53,9 +42,9 @@ pub struct RpmsgConnection {
     pub channel_name: String,
     #[serde(default = "default_remoteproc_path")]
     pub remoteproc_state_path: String,
-    #[serde(default = "default_settle", deserialize_with = "de_duration::deserialize")]
+    #[serde(default = "default_settle", deserialize_with = "de_duration")]
     pub settle: Duration,
-    #[serde(default = "default_rpmsg_timeout", deserialize_with = "de_duration::deserialize")]
+    #[serde(default = "default_rpmsg_timeout", deserialize_with = "de_duration")]
     pub timeout: Duration,
 }
 

@@ -42,7 +42,7 @@ impl Binary for CommandFilled {
     fn encode(&self, writer: &mut dyn Write, dict: Dictionary) {
         let outline = dict
             .get_outline_by_name(&self.name)
-            .expect("Unknown command name");
+            .expect(&format!("Unknown command name '{}'", self.name));
 
         vlq::encode_msgid_to(outline.id, writer);
 
@@ -51,6 +51,7 @@ impl Binary for CommandFilled {
                 .args
                 .get(param_name.as_str())
                 .expect("Missing parameter");
+
             encode_value(value, arg_type, writer);
         }
     }
