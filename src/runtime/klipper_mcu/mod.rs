@@ -4,10 +4,11 @@ use anyhow::anyhow;
 
 use crate::connections::gpio::GPIO;
 use crate::runtime::klipper_mcu::identify::IdentifyResults;
+use crate::traits::Stream;
 use crate::{
     config::{self, KlipperMCU},
-    connections::{Stream, rpmsg, socket::Socket},
-    traits::from_config::FromConfig,
+    connections::{rpmsg, socket::Socket},
+    traits::FromConfig,
 };
 
 pub mod identify;

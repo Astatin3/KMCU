@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use crate::traits::Stream;
 
 pub const MESSAGE_MIN: usize = 5;
 pub const MESSAGE_MAX: usize = 64;
@@ -56,7 +56,7 @@ impl Frame {
     }
 
     /// Write the raw frame bytes to a stream.
-    pub fn write_to(&self, writer: &mut dyn Write) -> anyhow::Result<()> {
+    pub fn write_to(&self, writer: &mut dyn Stream) -> anyhow::Result<()> {
         writer
             .write_all(&self.raw)
             .map_err(|e| anyhow::anyhow!("Failed to write frame: {e}"))
@@ -67,7 +67,7 @@ impl Frame {
     /// Uses sync-anchored validation: scans for `0x7e` sync bytes, then
     /// checks if the length byte and CRC are consistent at that position.
     /// Stale/garbage bytes before the frame are silently discarded.
-    pub fn read_from(reader: &mut dyn Read) -> anyhow::Result<Self> {
+    pub fn read_from(reader: &mut dyn Stream) -> anyhow::Result<Self> {
         let mut buf = Vec::with_capacity(MESSAGE_MAX * 2);
         let mut tmp = [0u8; MESSAGE_MAX];
 

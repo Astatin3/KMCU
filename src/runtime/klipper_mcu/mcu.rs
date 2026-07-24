@@ -2,7 +2,7 @@ use serde_json::json;
 
 use crate::{
     runtime::klipper_mcu::{KlipperMCURuntime, protocol::command::SendCommand},
-    traits::mcu::MCU,
+    traits::MCU,
 };
 
 impl MCU for KlipperMCURuntime {

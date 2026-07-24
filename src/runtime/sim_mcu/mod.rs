@@ -1,6 +1,6 @@
 use crate::{
     config::SimMCUConfig,
-    traits::{from_config::FromConfig, mcu::MCU},
+    traits::{FromConfig, MCU},
 };
 
 pub struct SimMCURuntime {

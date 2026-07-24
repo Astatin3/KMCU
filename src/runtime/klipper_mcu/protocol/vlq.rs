@@ -1,6 +1,6 @@
 // "Variable length quantity" derived from https://github.com/Klipper3d/klipper/blob/c707dd19214709dc23684b254a68e3bf69e4cfb3/src/command.c
 
-use std::io::{Read, Write};
+use crate::traits::{Read, Write};
 
 fn read_byte(reader: &mut dyn Read) -> anyhow::Result<u8> {
     let mut buf = [0u8; 1];
@@ -18,10 +18,7 @@ pub fn encode_int_to(v: u32, writer: &mut dyn Write) -> anyhow::Result<()> {
     }
 
     if sv < (3 << 12) && sv >= -(1 << 12) {
-        writer.write_all(&[
-            ((v >> 7) & 0x7f) as u8 | 0x80,
-            (v & 0x7f) as u8,
-        ])?;
+        writer.write_all(&[((v >> 7) & 0x7f) as u8 | 0x80, (v & 0x7f) as u8])?;
         return Ok(());
     }
 

@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{
     config::{Kinematics, MCUConfig, PrinterConfig},
     runtime::{core_xy::CoreXYRuntime, klipper_mcu::KlipperMCURuntime, sim_mcu::SimMCURuntime},
-    traits::{from_config::FromConfig, mcu::MCU},
+    traits::{FromConfig, MCU},
 };
 
 pub struct PrinterRuntime {

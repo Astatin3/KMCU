@@ -1,6 +1,6 @@
 use crate::{
     runtime::klipper_mcu::protocol::dictionary::{DictionaryRecv, DictionarySend},
-    traits::binary::Binary,
+    traits::{Binary, Read, Write},
 };
 
 macro_rules! command {
@@ -25,7 +25,7 @@ macro_rules! command {
             type EncodeArg = DictionarySend;
             type DecodeArg = DictionaryRecv;
 
-            fn encode(&self, writer: &mut dyn std::io::Write, dict: &DictionarySend) -> anyhow::Result<()> {
+            fn encode(&self, writer: &mut dyn Write, dict: &DictionarySend) -> anyhow::Result<()> {
                 match self {
                     $(
                         $ename::$vname $( { $($fname),* } )? => {
@@ -45,7 +45,7 @@ macro_rules! command {
                 }
             }
 
-            fn decode(reader: &mut dyn std::io::Read, dict: &DictionaryRecv) -> anyhow::Result<Self> {
+            fn decode(reader: &mut dyn Read, dict: &DictionaryRecv) -> anyhow::Result<Self> {
                 // Read the id
                 let id = <i16 as Binary>::decode(reader, &())?;
 

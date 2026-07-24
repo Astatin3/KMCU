@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
 use crate::config::SocketConnection;
-use crate::traits::from_config::FromConfig;
+use crate::traits::FromConfig;
 
 pub struct Socket {
     inner: File,
@@ -109,7 +109,7 @@ impl Write for Socket {
     }
 }
 
-impl crate::connections::Stream for Socket {}
+impl crate::traits::Stream for Socket {}
 
 impl FromConfig for Socket {
     type ConfigType = SocketConnection;

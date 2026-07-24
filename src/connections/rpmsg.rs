@@ -5,7 +5,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::time::{Duration, Instant};
 
 use crate::config::RpmsgConnection;
-use crate::traits::from_config::FromConfig;
+use crate::traits::{FromConfig, Stream};
 
 const RPMSG_NAME_SIZE: usize = 32;
 const RPMSG_ADDR_ANY: u32 = 0xFFFFFFFF;
@@ -131,7 +131,7 @@ impl RpmsgEndpoint {
     }
 }
 
-impl crate::connections::Stream for RpmsgEndpoint {}
+impl Stream for RpmsgEndpoint {}
 
 impl Drop for RpmsgEndpoint {
     fn drop(&mut self) {

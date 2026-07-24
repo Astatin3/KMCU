@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use crate::traits::{Read, Write};
 
 pub trait Binary: Sized {
     type EncodeArg;

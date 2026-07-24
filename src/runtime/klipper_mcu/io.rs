@@ -5,7 +5,7 @@ use crate::runtime::klipper_mcu::{
         message::Frame,
     },
 };
-use crate::traits::binary::Binary;
+use crate::traits::Binary;
 
 impl KlipperMCURuntime {
     pub fn send_command(&mut self, command: &SendCommand) -> anyhow::Result<()> {

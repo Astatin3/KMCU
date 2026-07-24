@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::{config::DummyAxisConfig, traits::axis::Axis};
+use crate::{config::DummyAxisConfig, traits::Axis};
 
 pub struct DummyAxis {
     config: DummyAxisConfig,

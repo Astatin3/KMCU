@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use crate::{
     config::{AxisConfig, CoreXYKinematics},
     runtime::axes::DummyAxis,
-    traits::{axis::Axis, from_config::FromConfig, mcu::MCU},
+    traits::{Axis, FromConfig, MCU},
 };
 
 pub struct CoreXYRuntime {
