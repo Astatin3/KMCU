@@ -38,8 +38,6 @@ impl FromConfig for PrinterRuntime {
                         anyhow::anyhow!("Failed to start Klipper MCU '{name}': {e}")
                     })?,
                 )) as Rc<RefCell<dyn MCU>>,
-
-                _ => todo!(),
             };
 
             mcus.insert(name, mcu);

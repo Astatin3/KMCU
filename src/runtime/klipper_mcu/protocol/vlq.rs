@@ -1,8 +1,6 @@
 // "Variable length quantity" derived from https://github.com/Klipper3d/klipper/blob/c707dd19214709dc23684b254a68e3bf69e4cfb3/src/command.c
 
-use std::io::Read;
-
-use bytes::BufMut;
+use std::io::{Read, Write};
 
 fn read_byte(reader: &mut dyn Read) -> anyhow::Result<u8> {
     let mut buf = [0u8; 1];
@@ -10,41 +8,57 @@ fn read_byte(reader: &mut dyn Read) -> anyhow::Result<u8> {
     Ok(buf[0])
 }
 
-/// Encode a 32-bit unsigned integer as a variable length quantity (VLQ) into a buffer.
-pub fn encode_int_to(v: u32, buf: &mut bytes::BytesMut) {
+/// Encode a 32-bit unsigned integer as a variable length quantity (VLQ) into a writer.
+pub fn encode_int_to(v: u32, writer: &mut dyn Write) {
     let sv = v as i32;
 
     if sv < (3 << 5) && sv >= -(1 << 5) {
-        buf.put_u8((v & 0x7f) as u8);
+        writer.write_all(&[(v & 0x7f) as u8]).unwrap();
         return;
     }
 
     if sv < (3 << 12) && sv >= -(1 << 12) {
-        buf.put_u8(((v >> 7) & 0x7f) as u8 | 0x80);
-        buf.put_u8((v & 0x7f) as u8);
+        writer
+            .write_all(&[
+                ((v >> 7) & 0x7f) as u8 | 0x80,
+                (v & 0x7f) as u8,
+            ])
+            .unwrap();
         return;
     }
 
     if sv < (3 << 19) && sv >= -(1 << 19) {
-        buf.put_u8(((v >> 14) & 0x7f) as u8 | 0x80);
-        buf.put_u8(((v >> 7) & 0x7f) as u8 | 0x80);
-        buf.put_u8((v & 0x7f) as u8);
+        writer
+            .write_all(&[
+                ((v >> 14) & 0x7f) as u8 | 0x80,
+                ((v >> 7) & 0x7f) as u8 | 0x80,
+                (v & 0x7f) as u8,
+            ])
+            .unwrap();
         return;
     }
 
     if sv < (3 << 26) && sv >= -(1 << 26) {
-        buf.put_u8(((v >> 21) & 0x7f) as u8 | 0x80);
-        buf.put_u8(((v >> 14) & 0x7f) as u8 | 0x80);
-        buf.put_u8(((v >> 7) & 0x7f) as u8 | 0x80);
-        buf.put_u8((v & 0x7f) as u8);
+        writer
+            .write_all(&[
+                ((v >> 21) & 0x7f) as u8 | 0x80,
+                ((v >> 14) & 0x7f) as u8 | 0x80,
+                ((v >> 7) & 0x7f) as u8 | 0x80,
+                (v & 0x7f) as u8,
+            ])
+            .unwrap();
         return;
     }
 
-    buf.put_u8(((v >> 28) & 0x7f) as u8 | 0x80);
-    buf.put_u8(((v >> 21) & 0x7f) as u8 | 0x80);
-    buf.put_u8(((v >> 14) & 0x7f) as u8 | 0x80);
-    buf.put_u8(((v >> 7) & 0x7f) as u8 | 0x80);
-    buf.put_u8((v & 0x7f) as u8);
+    writer
+        .write_all(&[
+            ((v >> 28) & 0x7f) as u8 | 0x80,
+            ((v >> 21) & 0x7f) as u8 | 0x80,
+            ((v >> 14) & 0x7f) as u8 | 0x80,
+            ((v >> 7) & 0x7f) as u8 | 0x80,
+            (v & 0x7f) as u8,
+        ])
+        .unwrap();
 }
 
 /// Encode a 32-bit unsigned integer as a variable length quantity (VLQ).
@@ -104,12 +118,16 @@ pub fn parse_int(reader: &mut dyn Read) -> anyhow::Result<u32> {
     Ok(v)
 }
 
-/// Encode a message ID (up to 16 bits) into a variable-length format in a buffer.
-pub fn encode_msgid_to(encoded_msgid: u16, buf: &mut bytes::BytesMut) {
+/// Encode a message ID (up to 16 bits) into a variable-length format in a writer.
+pub fn encode_msgid_to(encoded_msgid: u16, writer: &mut dyn Write) {
     if encoded_msgid >= 0x80 {
-        buf.put_u8(((encoded_msgid >> 7) & 0x7f) as u8 | 0x80);
+        writer
+            .write_all(&[((encoded_msgid >> 7) & 0x7f) as u8 | 0x80])
+            .unwrap();
     }
-    buf.put_u8((encoded_msgid & 0x7f) as u8);
+    writer
+        .write_all(&[(encoded_msgid & 0x7f) as u8])
+        .unwrap();
 }
 
 /// Encode a message ID (up to 16 bits) into a variable-length format.

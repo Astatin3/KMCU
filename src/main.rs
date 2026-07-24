@@ -13,9 +13,6 @@ mod config;
 
 mod runtime;
 
-#[allow(unused)]
-mod wire;
-
 mod gcode;
 
 mod connections;

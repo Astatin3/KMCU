@@ -1,7 +1,5 @@
 use std::io::{Read, Write};
 
-use bytes::{BufMut, Bytes, BytesMut};
-
 pub const MESSAGE_MIN: usize = 5;
 pub const MESSAGE_MAX: usize = 64;
 pub const MESSAGE_SYNC: u8 = 0x7e;
@@ -31,7 +29,7 @@ fn crc16_ccitt(buf: &[u8]) -> [u8; 2] {
 
 #[derive(Debug, Clone)]
 pub struct Frame {
-    raw: Bytes,
+    raw: Vec<u8>,
 }
 
 impl Frame {
@@ -45,19 +43,16 @@ impl Frame {
 
         let composed = compose_sequence_number(seq);
 
-        let mut buf = BytesMut::with_capacity(length);
-        buf.put_u8(length as u8);
-        buf.put_u8(composed);
+        let mut buf = Vec::with_capacity(length);
+        buf.push(length as u8);
+        buf.push(composed);
         buf.extend_from_slice(payload);
 
         let crc = crc16_ccitt(&buf);
-        buf.put_u8(crc[0]);
-        buf.put_u8(crc[1]);
-        buf.put_u8(MESSAGE_SYNC);
+        buf.extend_from_slice(&crc);
+        buf.push(MESSAGE_SYNC);
 
-        Some(Self {
-            raw: buf.freeze(),
-        })
+        Some(Self { raw: buf })
     }
 
     /// Write the raw frame bytes to a stream.
@@ -83,9 +78,7 @@ impl Frame {
                 if frame_start > 0 {
                     trace!("Discarded {} stale bytes", frame_start);
                 }
-                return Ok(Self {
-                    raw: Bytes::from(frame_bytes),
-                });
+                return Ok(Self { raw: frame_bytes });
             }
 
             // No complete frame yet — read more data.
@@ -124,7 +117,7 @@ impl Frame {
     }
 
     /// Consume the frame and return the raw wire bytes.
-    pub fn into_bytes(self) -> Bytes {
+    pub fn into_bytes(self) -> Vec<u8> {
         self.raw
     }
 }

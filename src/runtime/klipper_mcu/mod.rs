@@ -3,22 +3,29 @@ use std::os::unix::process::CommandExt;
 use std::process::Command;
 
 use anyhow::anyhow;
-use bytes::BytesMut;
 use serde_json::json;
 
 use crate::{
     config::{self, KlipperMCU},
-    connections::{Stream, rpmsg, serial::Serial, socket::Socket},
+    connections::{Stream, rpmsg, socket::Socket},
     traits::{binary::Binary, from_config::FromConfig, mcu::MCU},
-    wire::types::{
-        command::CommandFilled,
-        dictionary::{DEFAULT_DICT, Dictionary},
-        message::Frame,
-    },
 };
 
 pub mod identify;
 mod mcu;
+
+pub mod protocol {
+    pub mod command;
+    pub mod dictionary;
+    pub mod message;
+    pub mod vlq;
+}
+
+use protocol::{
+    command::CommandFilled,
+    dictionary::{DEFAULT_DICT, Dictionary},
+    message::Frame,
+};
 
 pub struct KlipperMCURuntime {
     stream: Box<dyn Stream>,
@@ -52,7 +59,7 @@ impl KlipperMCURuntime {
     }
 
     fn send_command(&mut self, command: &CommandFilled) -> anyhow::Result<()> {
-        let mut payload = BytesMut::with_capacity(64);
+        let mut payload = Vec::with_capacity(64);
         command.encode(&mut payload, self.commands.clone());
 
         let seq = (self.seq % 16) as u8;
@@ -123,11 +130,7 @@ impl FromConfig for KlipperMCURuntime {
         }
 
         let stream: Box<dyn Stream> = match config.connection {
-            config::Connection::Serial(conn) => Box::new(
-                Serial::from_config(conn)
-                    .map_err(|e| anyhow!("Failed to create serial connection: {e}"))?,
-            ),
-            config::Connection::Socket(conn) => Box::new(
+            config::Connection::Serial(conn) | config::Connection::Socket(conn) => Box::new(
                 Socket::from_config(conn)
                     .map_err(|e| anyhow!("Failed to create socket connection: {e}"))?,
             ),

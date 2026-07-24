@@ -1,38 +1,49 @@
+use std::time::Duration;
+
 use serde::Deserialize;
+
+mod de_duration {
+    use serde::{self, Deserialize, Deserializer};
+    use std::time::Duration;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let ms = u64::deserialize(deserializer)?;
+        Ok(Duration::from_millis(ms))
+    }
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 pub enum Connection {
     #[serde(rename = "serial")]
-    Serial(SerialConnection),
+    Serial(SocketConnection),
     #[serde(rename = "socket")]
     Socket(SocketConnection),
     #[serde(rename = "rpmsg")]
     Rpmsg(RpmsgConnection),
 }
 
-fn default_baud() -> u32 {
-    115_200
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SerialConnection {
-    pub path: String,
-    #[serde(default = "default_baud")]
-    pub baud: u32,
+fn default_timeout() -> Duration {
+    Duration::from_millis(100)
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SocketConnection {
     pub path: String,
+    pub baud: Option<u32>,
+    #[serde(default = "default_timeout", deserialize_with = "de_duration::deserialize")]
+    pub timeout: Duration,
 }
 
-fn default_settle() -> u64 {
-    4
+fn default_settle() -> Duration {
+    Duration::from_millis(4000)
 }
 
-fn default_timeout() -> u64 {
-    10
+fn default_rpmsg_timeout() -> Duration {
+    Duration::from_millis(10000)
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,10 +53,10 @@ pub struct RpmsgConnection {
     pub channel_name: String,
     #[serde(default = "default_remoteproc_path")]
     pub remoteproc_state_path: String,
-    #[serde(default = "default_settle")]
-    pub settle: u64,
-    #[serde(default = "default_timeout")]
-    pub timeout: u64,
+    #[serde(default = "default_settle", deserialize_with = "de_duration::deserialize")]
+    pub settle: Duration,
+    #[serde(default = "default_rpmsg_timeout", deserialize_with = "de_duration::deserialize")]
+    pub timeout: Duration,
 }
 
 fn default_rpmsg_ctrl_path() -> String {

@@ -1,12 +1,10 @@
-use std::io::Read;
-
-use bytes::BytesMut;
+use std::io::{Read, Write};
 
 pub trait Binary: Sized {
     type EncodeArg;
     type DecodeArg;
 
-    fn encode(&self, buf: &mut BytesMut, arg: Self::EncodeArg);
+    fn encode(&self, writer: &mut dyn Write, arg: Self::EncodeArg);
     fn decode(reader: &mut dyn Read, arg: Self::DecodeArg) -> anyhow::Result<Self>;
 }
 
@@ -16,12 +14,12 @@ macro_rules! binary_vlq_unsigned {
             type EncodeArg = ();
             type DecodeArg = ();
 
-            fn encode(&self, buf: &mut BytesMut, _: ()) {
-                crate::wire::vlq::encode_int_to(*self as u32, buf);
+            fn encode(&self, writer: &mut dyn Write, _: ()) {
+                crate::runtime::klipper_mcu::protocol::vlq::encode_int_to(*self as u32, writer);
             }
 
             fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
-                let v = crate::wire::vlq::parse_int(reader)?;
+                let v = crate::runtime::klipper_mcu::protocol::vlq::parse_int(reader)?;
                 Ok(v as $t)
             }
         }
@@ -34,12 +32,12 @@ macro_rules! binary_vlq_signed {
             type EncodeArg = ();
             type DecodeArg = ();
 
-            fn encode(&self, buf: &mut BytesMut, _: ()) {
-                crate::wire::vlq::encode_int_to(*self as u32, buf);
+            fn encode(&self, writer: &mut dyn Write, _: ()) {
+                crate::runtime::klipper_mcu::protocol::vlq::encode_int_to(*self as u32, writer);
             }
 
             fn decode(reader: &mut dyn Read, _: ()) -> anyhow::Result<Self> {
-                let v = crate::wire::vlq::parse_int(reader)?;
+                let v = crate::runtime::klipper_mcu::protocol::vlq::parse_int(reader)?;
                 Ok(v as $t)
             }
         }
@@ -57,9 +55,9 @@ impl<T: Binary<EncodeArg = ()>> Binary for Vec<T> {
     type EncodeArg = ();
     type DecodeArg = ();
 
-    fn encode(&self, buf: &mut BytesMut, _: ()) {
+    fn encode(&self, writer: &mut dyn Write, _: ()) {
         for item in self {
-            item.encode(buf, ());
+            item.encode(writer, ());
         }
     }
 

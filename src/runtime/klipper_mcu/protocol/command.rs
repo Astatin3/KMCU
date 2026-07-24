@@ -1,12 +1,14 @@
-use std::io::Read;
+use std::io::{Read, Write};
 
 use anyhow::anyhow;
-use bytes::{BufMut, BytesMut};
 use serde_json::Value;
 
 use crate::{
+    runtime::klipper_mcu::protocol::{
+        dictionary::{ArgType, Dictionary},
+        vlq,
+    },
     traits::binary::Binary,
-    wire::types::dictionary::{ArgType, CommandOutline, Dictionary},
 };
 
 #[derive(Debug, Clone)]
@@ -37,24 +39,24 @@ impl Binary for CommandFilled {
     type EncodeArg = Dictionary;
     type DecodeArg = Dictionary;
 
-    fn encode(&self, buf: &mut BytesMut, dict: Dictionary) {
+    fn encode(&self, writer: &mut dyn Write, dict: Dictionary) {
         let outline = dict
             .get_outline_by_name(&self.name)
             .expect("Unknown command name");
 
-        super::super::vlq::encode_msgid_to(outline.id, buf);
+        vlq::encode_msgid_to(outline.id, writer);
 
         for (param_name, arg_type) in &outline.parameters {
             let value = self
                 .args
                 .get(param_name.as_str())
                 .expect("Missing parameter");
-            encode_value(value, arg_type, buf);
+            encode_value(value, arg_type, writer);
         }
     }
 
     fn decode(reader: &mut dyn Read, dict: Dictionary) -> anyhow::Result<Self> {
-        let id = super::super::vlq::parse_msgid(reader)?;
+        let id = vlq::parse_msgid(reader)?;
 
         let outline = dict
             .get_outline(id)
@@ -72,48 +74,42 @@ impl Binary for CommandFilled {
     }
 }
 
-fn encode_value(value: &Value, arg_type: &ArgType, buf: &mut BytesMut) {
+fn encode_value(value: &Value, arg_type: &ArgType, writer: &mut dyn Write) {
     match arg_type {
         ArgType::Uint32 => {
-            super::super::vlq::encode_int_to(value.as_u64().unwrap() as u32, buf);
+            vlq::encode_int_to(value.as_u64().unwrap() as u32, writer);
         }
         ArgType::Int32 => {
-            super::super::vlq::encode_int_to(value.as_i64().unwrap() as u32, buf);
+            vlq::encode_int_to(value.as_i64().unwrap() as u32, writer);
         }
         ArgType::Uint16 => {
-            super::super::vlq::encode_int_to(value.as_u64().unwrap() as u32, buf);
+            vlq::encode_int_to(value.as_u64().unwrap() as u32, writer);
         }
         ArgType::Int16 => {
-            super::super::vlq::encode_int_to(value.as_i64().unwrap() as u32, buf);
+            vlq::encode_int_to(value.as_i64().unwrap() as u32, writer);
         }
         ArgType::Byte => {
-            buf.put_u8(value.as_u64().unwrap() as u8);
+            writer.write_all(&[value.as_u64().unwrap() as u8]).unwrap();
         }
         ArgType::String => {
             let s = value.as_str().unwrap();
-            buf.put_u8(s.len() as u8);
-            buf.extend_from_slice(s.as_bytes());
+            writer.write_all(&[s.len() as u8]).unwrap();
+            writer.write_all(s.as_bytes()).unwrap();
         }
         ArgType::ProgmemBuffer | ArgType::Buffer => {
             let bytes = value_to_bytes(value);
-            buf.put_u8(bytes.len() as u8);
-            buf.extend_from_slice(&bytes);
+            writer.write_all(&[bytes.len() as u8]).unwrap();
+            writer.write_all(&bytes).unwrap();
         }
     }
 }
 
 fn decode_value(reader: &mut dyn Read, arg_type: &ArgType) -> anyhow::Result<Value> {
     match arg_type {
-        ArgType::Uint32 => Ok(Value::Number(super::super::vlq::parse_int(reader)?.into())),
-        ArgType::Int32 => Ok(Value::Number(
-            (super::super::vlq::parse_int(reader)? as i32).into(),
-        )),
-        ArgType::Uint16 => Ok(Value::Number(
-            (super::super::vlq::parse_int(reader)? as u16).into(),
-        )),
-        ArgType::Int16 => Ok(Value::Number(
-            (super::super::vlq::parse_int(reader)? as i16).into(),
-        )),
+        ArgType::Uint32 => Ok(Value::Number(vlq::parse_int(reader)?.into())),
+        ArgType::Int32 => Ok(Value::Number((vlq::parse_int(reader)? as i32).into())),
+        ArgType::Uint16 => Ok(Value::Number((vlq::parse_int(reader)? as u16).into())),
+        ArgType::Int16 => Ok(Value::Number((vlq::parse_int(reader)? as i16).into())),
         ArgType::Byte => {
             let mut byte = [0u8; 1];
             reader.read_exact(&mut byte)?;

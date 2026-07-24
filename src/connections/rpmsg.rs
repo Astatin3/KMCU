@@ -80,13 +80,13 @@ impl RpmsgEndpoint {
 
     fn connect(&mut self) -> anyhow::Result<()> {
         if !self.config.remoteproc_state_path.is_empty() {
-            if let Err(e) = restart_remoteproc(&self.config.remoteproc_state_path, Duration::from_secs(self.config.settle)) {
+            if let Err(e) = restart_remoteproc(&self.config.remoteproc_state_path, self.config.settle) {
                 warn!("Failed to restart DSP via remoteproc: {e}");
             }
         }
 
         debug!("Waiting for RPMSG ctrl device: {}", self.config.ctrl_path);
-        wait_for_path(&self.config.ctrl_path, Duration::from_secs(self.config.timeout))?;
+        wait_for_path(&self.config.ctrl_path, self.config.timeout)?;
         debug!("RPMSG ctrl device found");
 
         let before = list_rpmsg_devices()?;
@@ -94,7 +94,7 @@ impl RpmsgEndpoint {
         // Retry endpoint creation — right after a DSP restart the ctrl
         // device node can appear before the remote firmware has finished
         // booting, so the ioctl may fail briefly.
-        let create_deadline = Instant::now() + Duration::from_secs(self.config.timeout);
+        let create_deadline = Instant::now() + self.config.timeout;
         let ept_id = loop {
             match create_endpoint(&self.config.ctrl_path, &self.config.channel_name) {
                 Ok(id) => break id,
@@ -112,11 +112,11 @@ impl RpmsgEndpoint {
         // if the ID is unknown (kernel didn't write back).
         let ept_path = if ept_id >= 0 {
             let path = format!("/dev/rpmsg{ept_id}");
-            wait_for_path(&path, Duration::from_secs(self.config.timeout))?;
+            wait_for_path(&path, self.config.timeout)?;
             path
         } else {
             debug!("Kernel did not return endpoint ID, scanning /dev");
-            wait_for_new_rpmsg(&before, Duration::from_secs(self.config.timeout))?
+            wait_for_new_rpmsg(&before, self.config.timeout)?
         };
         debug!("RPMSG data endpoint: {ept_path}");
 
@@ -151,14 +151,14 @@ impl Read for RpmsgEndpoint {
             std::io::Error::new(std::io::ErrorKind::NotConnected, "RPMSG not connected")
         })?;
 
-        match poll_then_read(fd, Duration::from_secs(self.config.timeout), buf) {
+        match poll_then_read(fd, self.config.timeout, buf) {
             Ok(n) => Ok(n),
             Err(e) if io_err_is_recoverable(&e) => {
                 warn!("RPMSG read failed ({e}), reconnecting");
                 self.reconnect()
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
                 let fd = self.data_fd.as_mut().unwrap();
-                poll_then_read(fd, Duration::from_secs(self.config.timeout), buf)
+                poll_then_read(fd, self.config.timeout, buf)
             }
             Err(e) => Err(e),
         }
@@ -202,7 +202,7 @@ impl Write for RpmsgEndpoint {
                 "RPMSG not connected",
             ));
         }
-                let deadline = Instant::now() + Duration::from_secs(self.config.timeout);
+                let deadline = Instant::now() + self.config.timeout;
         let result = write_with_timeout(self.data_fd.as_mut().unwrap(), buf, deadline);
         match result {
             Ok(n) => Ok(n),
@@ -210,7 +210,7 @@ impl Write for RpmsgEndpoint {
                 warn!("RPMSG write failed ({e}), reconnecting");
                 self.reconnect()
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        let deadline = Instant::now() + Duration::from_secs(self.config.timeout);
+        let deadline = Instant::now() + self.config.timeout;
                 write_with_timeout(self.data_fd.as_mut().unwrap(), buf, deadline)
             }
             Err(e) => Err(e),

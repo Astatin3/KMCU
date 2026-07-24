@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::{
-    runtime::klipper_mcu::KlipperMCURuntime,
-    wire::types::{
+use crate::runtime::klipper_mcu::{
+    KlipperMCURuntime,
+    protocol::{
         command::CommandFilled,
         dictionary::{CommandOutline, Dictionary},
     },
@@ -18,6 +18,7 @@ pub struct IdentifyResults {
     pub license: String,
     pub config: HashMap<String, serde_json::Value>,
     pub enumerations: HashMap<String, HashMap<String, serde_json::Value>>,
+
     pub commands: HashMap<String, u16>,
     pub responses: HashMap<String, u16>,
     pub output: HashMap<String, u16>,

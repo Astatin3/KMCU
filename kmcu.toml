@@ -18,17 +18,17 @@ axis_z = ["mainboard", "stepper_z"]
 axis_extruder = ["toolhead", "stepper_extruder"]
 
 [mcu.mainboard]
-type = "klipper"
-connection = { type = "rpmsg", channel_name = "cpu_dsp0" }
+type = "sim"
+# connection = { type = "rpmsg", channel_name = "cpu_dsp0" }
 
 [mcu.toolhead]
-type = "sim"
+type = "klipper"
 
-# connection = {
-#     type = "serial",
-#     path = "/dev/ttyS3",
-#     baud = 250000
-# }
+connection = {
+    type = "serial",
+    path = "/dev/ttyS3",
+    baud = 250000
+}
 
 [axis]
 stepper_x = { type = "dummy" }
