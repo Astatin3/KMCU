@@ -19,7 +19,7 @@ axis_extruder = ["toolhead", "stepper_extruder"]
 
 [mcu.mainboard]
 type = "klipper"
-connection = { type = "rpmsg", channel_name = "cpu_dsp0", settle = 4, timeout = 10 }
+connection = { type = "rpmsg", channel_name = "cpu_dsp0" }
 
 [mcu.toolhead]
 type = "sim"

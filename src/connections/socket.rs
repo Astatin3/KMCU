@@ -65,11 +65,7 @@ impl Write for Socket {
     }
 }
 
-impl crate::connections::Stream for Socket {
-    fn read_timeout(&self) -> Duration {
-        self.timeout
-    }
-}
+impl crate::connections::Stream for Socket {}
 
 impl FromConfig for Socket {
     type ConfigType = SocketConnection;

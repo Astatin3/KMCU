@@ -26,6 +26,8 @@ impl FromConfig for PrinterRuntime {
         let mut mcus = HashMap::with_capacity(config.mcu.len());
 
         for (name, mcu_config) in config.mcu {
+            debug!("Initializing runtime '{name}'");
+
             let mcu = match mcu_config {
                 MCUConfig::Sim(sim_mcuconfig) => {
                     Rc::new(RefCell::new(SimMCURuntime::from_config(sim_mcuconfig)?))

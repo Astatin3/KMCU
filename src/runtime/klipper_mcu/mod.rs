@@ -1,7 +1,6 @@
 use std::io::{Read, Write};
 use std::os::unix::process::CommandExt;
 use std::process::Command;
-use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use bytes::BytesMut;
@@ -42,36 +41,12 @@ impl KlipperMCURuntime {
             output: DEFAULT_DICT.clone(),
         };
 
-        let deadline = Instant::now() + Duration::from_secs(90);
-        let mut attempt = 0;
-
-        let results = loop {
-            attempt += 1;
-            debug!("Identification attempt {attempt}...");
-
-            match this.identify() {
-                Ok(r) => break r,
-                Err(e) => {
-                    if Instant::now() >= deadline {
-                        anyhow::bail!("Identification failed after {attempt} attempts: {e}");
-                    }
-                    warn!("Identification attempt {attempt} failed: {e}, reconnecting...");
-                    this.stream
-                        .reconnect()
-                        .map_err(|re| anyhow!("Reconnect failed: {re} (original: {e})"))?;
-                    std::thread::sleep(Duration::from_secs(2));
-                }
-            }
-        };
-
-        debug!("Received identify results: {results:?}");
+        let results = this.identify()?;
 
         let (commands, responses, output) = results.build_dictionaries()?;
         this.commands = commands;
         this.responses = responses;
         this.output = output;
-
-        log::debug!("Got identity from MCU app={}", results.app);
 
         Ok(this)
     }
@@ -91,8 +66,7 @@ impl KlipperMCURuntime {
     }
 
     fn recv_frame(&mut self) -> anyhow::Result<Frame> {
-        let deadline = Instant::now() + self.stream.read_timeout();
-        let frame = Frame::read_from(&mut *self.stream, deadline)?;
+        let frame = Frame::read_from(&mut *self.stream)?;
         self.seq = frame.seq() as usize;
         Ok(frame)
     }

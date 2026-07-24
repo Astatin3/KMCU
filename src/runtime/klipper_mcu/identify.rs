@@ -28,7 +28,9 @@ impl IdentifyResults {
         let mut z = flate2::read::ZlibDecoder::new(zlib_bytes);
         let mut s = String::new();
         std::io::Read::read_to_string(&mut z, &mut s)?;
+
         debug!("Got klipper string: {s}");
+
         let results: Self = serde_json::from_str(&s)?;
         Ok(results)
     }
@@ -78,9 +80,7 @@ impl KlipperMCURuntime {
                 }),
             ))?;
 
-            // Two packets per request: the response and an ACK
             let cmd = self.recv_command()?;
-            // let _ = self.recv_frame_or_ack()?;
 
             let mut cmd = cmd;
             let buf = cmd.take_buffer("data").unwrap_or_default();

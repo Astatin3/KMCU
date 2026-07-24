@@ -36,13 +36,9 @@ fn main() {
     }
 }
 
-// fn pin_int(pin_name: String) -> u32 {
-//     let port = pin_name.chars().nth(1).unwrap() - 'A'; // 'E' - 'A' = 4
-//     pin_idx = std::stoi(pin_name.substr(2)); // 17
-//     pin = port * 32 + pin_idx; // 4*32 + 17 = 145
-// }
-
 fn run() -> anyhow::Result<()> {
+    info!("Starting printer...");
+
     let config = PrinterConfig::parse(include_str!("../kmcu.toml"))?;
 
     let printer = PrinterRuntime::from_config(config)?;

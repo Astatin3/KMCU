@@ -1,5 +1,4 @@
 use std::io::{Read, Write};
-use std::time::Instant;
 
 use bytes::{BufMut, Bytes, BytesMut};
 
@@ -73,47 +72,30 @@ impl Frame {
     /// Uses sync-anchored validation: scans for `0x7e` sync bytes, then
     /// checks if the length byte and CRC are consistent at that position.
     /// Stale/garbage bytes before the frame are silently discarded.
-    ///
-    /// Returns an error if `deadline` is reached before a valid frame arrives.
-    pub fn read_from(reader: &mut dyn Read, deadline: Instant) -> anyhow::Result<Self> {
+    pub fn read_from(reader: &mut dyn Read) -> anyhow::Result<Self> {
         let mut buf = Vec::with_capacity(MESSAGE_MAX * 2);
-        let mut scratch = [0u8; 1];
+        let mut tmp = [0u8; MESSAGE_MAX];
 
         loop {
-            if Instant::now() >= deadline {
-                anyhow::bail!("Timed out waiting for frame");
-            }
-
-            // Fill buffer
-            while buf.len() < MESSAGE_MAX {
-                match reader.read(&mut scratch) {
-                    Ok(0) => anyhow::bail!("Connection closed"),
-                    Ok(_) => buf.push(scratch[0]),
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock
-                        || e.kind() == std::io::ErrorKind::TimedOut =>
-                    {
-                        break;
-                    }
-                    Err(e) => return Err(e.into()),
-                }
-            }
-
-            if buf.is_empty() {
-                anyhow::bail!("No data available");
-            }
-
-            // Sync-anchored scan: for each 0x7e in the buffer, check if it
-            // forms a valid frame with a preceding length byte.
+            // Try to find a frame in whatever we have so far.
             if let Some((frame_start, frame_len)) = find_frame(&buf) {
                 let frame_bytes = buf[frame_start..frame_start + frame_len].to_vec();
-
                 if frame_start > 0 {
                     trace!("Discarded {} stale bytes", frame_start);
                 }
-
                 return Ok(Self {
                     raw: Bytes::from(frame_bytes),
                 });
+            }
+
+            // No complete frame yet — read more data.
+            match reader.read(&mut tmp) {
+                Ok(0) => anyhow::bail!("Connection closed"),
+                Ok(n) => {
+                    buf.extend_from_slice(&tmp[..n]);
+                    trace!("read_from: read {} bytes, buf={} bytes", n, buf.len());
+                }
+                Err(e) => return Err(e.into()),
             }
 
             // No complete frame yet. If buffer is getting large, trim garbage.
