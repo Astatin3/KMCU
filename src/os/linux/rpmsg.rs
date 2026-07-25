@@ -1,12 +1,16 @@
 use std::ffi::CString;
-use std::fs;
 use std::io::{Read as _, Write as _};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::time::{Duration, Instant};
+use std::string::{String, ToString};
+use std::vec::Vec;
+use std::{format, fs};
+
+use crate::units;
 
 use crate::config::RpmsgConnection;
 use crate::error::Res;
-use crate::traits::{FromConfig, Read, Stream, Write};
+use crate::os::linux::clock;
+use crate::traits::{Read, Stream, Write};
 
 const RPMSG_NAME_SIZE: usize = 32;
 const RPMSG_ADDR_ANY: u32 = 0xFFFFFFFF;
@@ -46,7 +50,7 @@ pub struct RpmsgEndpoint {
 }
 
 impl RpmsgEndpoint {
-    pub fn new(config: RpmsgConnection) -> Res<Self> {
+    pub fn from_config(config: RpmsgConnection) -> Res<Self> {
         let mut this = Self {
             data_fd: None,
             config,
@@ -97,13 +101,14 @@ impl RpmsgEndpoint {
         // Retry endpoint creation — right after a DSP restart the ctrl
         // device node can appear before the remote firmware has finished
         // booting, so the ioctl may fail briefly.
-        let create_deadline = Instant::now() + self.config.timeout;
+        let create_deadline = clock::now() + self.config.timeout;
         let ept_id = loop {
             match create_endpoint(&self.config.ctrl_path, &self.config.channel_name) {
                 Ok(id) => break id,
-                Err(e) if Instant::now() < create_deadline => {
+                Err(e) if clock::now() < create_deadline => {
                     debug!("RPMSG_CREATE_EPT not ready yet, retrying: {e:?}");
-                    std::thread::sleep(Duration::from_millis(250));
+
+                    clock::sleep(units::LongTime::new::<units::long_millisecond>(250));
                 }
                 Err(e) => return Err(e),
             }
@@ -171,25 +176,32 @@ impl Read for RpmsgEndpoint {
 fn write_with_timeout(
     fd: &mut std::fs::File,
     buf: &[u8],
-    deadline: Instant,
+    deadline: units::LongTime,
 ) -> std::io::Result<usize> {
     let mut written = 0;
-    let poll_timeout = Duration::from_millis(100);
+
+    let poll_timeout = units::LongTime::new::<units::long_millisecond>(100);
+
     while written < buf.len() {
-        let remaining = deadline
-            .checked_duration_since(Instant::now())
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "RPMSG write timed out: kernel never consumed data",
-                )
-            })?;
+        let now = clock::now();
+        if deadline <= now {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "RPMSG write timed out: kernel never consumed data",
+            ));
+        }
+        let remaining = deadline - now;
         match fd.write(&buf[written..]) {
             Ok(n) => {
                 written += n;
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                let _ = poll_ready(fd.as_raw_fd(), libc::POLLOUT, remaining.min(poll_timeout));
+                let wait = if remaining < poll_timeout {
+                    remaining
+                } else {
+                    poll_timeout
+                };
+                let _ = poll_ready(fd.as_raw_fd(), libc::POLLOUT, wait);
             }
             Err(e) => return Err(e),
         }
@@ -202,19 +214,18 @@ impl Write for RpmsgEndpoint {
         if self.data_fd.is_none() {
             return Err(err!("RPMSG not connected"));
         }
-        let deadline = Instant::now() + self.config.timeout;
+        let deadline = clock::now() + self.config.timeout;
         let result = write_with_timeout(self.data_fd.as_mut().unwrap(), buf, deadline);
         match result {
             Ok(n) => Ok(n),
             Err(e) if io_err_is_recoverable(&e) => {
                 warn!("RPMSG write failed ({e}), reconnecting");
                 self.reconnect()?;
-                let deadline = Instant::now() + self.config.timeout;
-                Ok(write_with_timeout(
-                    self.data_fd.as_mut().unwrap(),
-                    buf,
-                    deadline,
-                ).map_err(|e| err!("{e}"))?)
+                let deadline = clock::now() + self.config.timeout;
+                Ok(
+                    write_with_timeout(self.data_fd.as_mut().unwrap(), buf, deadline)
+                        .map_err(|e| err!("{e}"))?,
+                )
             }
             Err(e) => Err(err!("{e}")),
         }
@@ -229,32 +240,26 @@ impl Write for RpmsgEndpoint {
 }
 
 /// Poll for POLLIN then read — the rpmsg chardev does report POLLIN.
-fn poll_then_read(fd: &std::fs::File, timeout: Duration, buf: &mut [u8]) -> std::io::Result<usize> {
+fn poll_then_read(
+    fd: &std::fs::File,
+    timeout: units::LongTime,
+    buf: &mut [u8],
+) -> std::io::Result<usize> {
     poll_ready(fd.as_raw_fd(), libc::POLLIN, timeout)?;
     let mut fd = fd;
     fd.read(buf)
 }
 
-impl FromConfig for RpmsgEndpoint {
-    type ConfigType = RpmsgConnection;
-
-    fn from_config(config: Self::ConfigType) -> Res<Self>
-    where
-        Self: Sized,
-    {
-        Self::new(config)
-    }
-}
-
 // --- Low-level helpers ---
 
-fn wait_for_path(path: &str, timeout: Duration) -> Res<()> {
-    let deadline = Instant::now() + timeout;
+fn wait_for_path(path: &str, timeout: units::LongTime) -> Res<()> {
+    let deadline = clock::now() + timeout;
     while !fs::metadata(path).is_ok() {
-        if Instant::now() >= deadline {
+        if clock::now() >= deadline {
             return Err(err!("Timed out waiting for {path}"));
         }
-        std::thread::sleep(Duration::from_millis(50));
+
+        clock::sleep(units::LongTime::new::<units::long_millisecond>(50));
     }
     Ok(())
 }
@@ -360,8 +365,8 @@ fn destroy_endpoint(ctrl_path: &str, ept_id: i32) -> Res<()> {
     Ok(())
 }
 
-fn wait_for_new_rpmsg(before: &[String], timeout: Duration) -> Res<String> {
-    let deadline = Instant::now() + timeout;
+fn wait_for_new_rpmsg(before: &[String], timeout: units::LongTime) -> Res<String> {
+    let deadline = clock::now() + timeout;
     loop {
         let current = list_rpmsg_devices()?;
         for dev in &current {
@@ -369,10 +374,10 @@ fn wait_for_new_rpmsg(before: &[String], timeout: Duration) -> Res<String> {
                 return Ok(dev.clone());
             }
         }
-        if Instant::now() >= deadline {
+        if clock::now() >= deadline {
             return Err(err!("Timed out waiting for new /dev/rpmsgN device"));
         }
-        std::thread::sleep(Duration::from_millis(100));
+        clock::sleep(units::LongTime::new::<units::long_millisecond>(100));
     }
 }
 
@@ -402,13 +407,13 @@ fn open_data_endpoint(path: &str) -> Res<std::fs::File> {
     Ok(unsafe { std::fs::File::from_raw_fd(fd) })
 }
 
-fn poll_ready(fd: RawFd, events: i16, timeout: Duration) -> std::io::Result<()> {
+fn poll_ready(fd: RawFd, events: i16, timeout: units::LongTime) -> std::io::Result<()> {
     let mut pollfd = libc::pollfd {
         fd,
         events,
         revents: 0,
     };
-    let ms = timeout.as_millis() as i32;
+    let ms = timeout.get::<units::long_millisecond>() as i32;
     let ret = unsafe { libc::poll(&mut pollfd, 1, ms) };
     if ret < 0 {
         return Err(std::io::Error::last_os_error());
@@ -428,17 +433,18 @@ fn poll_ready(fd: RawFd, events: i16, timeout: Duration) -> std::io::Result<()> 
     Ok(())
 }
 
-fn restart_remoteproc(state_path: &str, settle: Duration) -> Res<()> {
+fn restart_remoteproc(state_path: &str, settle: units::LongTime) -> Res<()> {
     debug!("Restarting DSP via remoteproc: {state_path}");
 
     if let Err(e) = fs::write(state_path, "stop") {
         warn!("Failed to write 'stop' to {state_path} (likely already stopped): {e}");
     }
-    std::thread::sleep(settle);
+    clock::sleep(settle);
 
     fs::write(state_path, "start")
         .map_err(|e| err!("Failed to write 'start' to {state_path}: {e}"))?;
-    std::thread::sleep(settle);
+
+    clock::sleep(settle);
 
     debug!("DSP restarted, waiting for settle");
     Ok(())

@@ -3,10 +3,13 @@ use alloc::string::String;
 use serde::Deserialize;
 
 mod de;
-mod iter;
 
 use de::{Error, from_str};
 
+#[cfg(feature = "std")]
+mod iter;
+
+#[cfg(feature = "std")]
 pub use iter::GcodeIter;
 
 #[derive(Debug, Deserialize)]

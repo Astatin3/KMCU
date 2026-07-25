@@ -1,6 +1,7 @@
-use std::fmt;
-
-use alloc::{format, string::String};
+use alloc::{
+    fmt, format,
+    string::{String, ToString},
+};
 use serde::{Deserialize, Deserializer};
 
 #[derive(Debug, Clone)]

@@ -2,9 +2,11 @@ use std::fs::File;
 use std::io::{Read as _, Write as _};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
-use crate::config::SocketConnection;
+use crate::units;
+
+use crate::config::{SerialConnection, SocketConnection};
 use crate::error::Res;
-use crate::traits::{FromConfig, Read, Stream, Write};
+use crate::traits::{Read, Stream, Write};
 
 pub struct Socket {
     fd: File,
@@ -22,9 +24,7 @@ impl Socket {
         Ok(Self { fd, config })
     }
 
-    pub fn new_serial(config: SocketConnection) -> Res<Self> {
-        let baud = config.baud.unwrap_or(115_200);
-
+    pub fn new_serial(config: SerialConnection) -> Res<Self> {
         let fd = unsafe {
             let raw_fd = libc::open(
                 config.path.as_ptr() as *const libc::c_char,
@@ -43,9 +43,10 @@ impl Socket {
             libc::cfmakeraw(&mut termios);
 
             // Baud rate via BOTHER
+            let baud = config.baud as libc::speed_t;
             termios.c_cflag = (termios.c_cflag & !libc::CBAUD) | libc::BOTHER;
-            libc::cfsetispeed(&mut termios, baud as libc::speed_t);
-            libc::cfsetospeed(&mut termios, baud as libc::speed_t);
+            libc::cfsetispeed(&mut termios, baud);
+            libc::cfsetospeed(&mut termios, baud);
 
             // Non-blocking for poll-based timeout
             termios.c_cc[libc::VMIN] = 0;
@@ -64,10 +65,17 @@ impl Socket {
         };
 
         debug!(
-            "Opened serial port '{}' at {baud} baud, timeout={:?}",
-            config.path, config.timeout
+            "Opened serial port '{}' at {} baud, timeout={:?}",
+            config.baud, config.path, config.timeout
         );
-        Ok(Self { fd, config })
+
+        Ok(Self {
+            fd,
+            config: SocketConnection {
+                path: config.path,
+                timeout: config.timeout,
+            },
+        })
     }
 
     fn poll_ready(&self, fd: RawFd, events: i16) -> Res<()> {
@@ -77,7 +85,7 @@ impl Socket {
             revents: 0,
         };
 
-        let ms = self.config.timeout.as_millis() as i32;
+        let ms = self.config.timeout.get::<units::long_millisecond>() as i32;
         let ret = unsafe { libc::poll(&mut pollfd, 1, ms) };
 
         if ret < 0 {
@@ -113,18 +121,3 @@ impl Write for Socket {
 }
 
 impl Stream for Socket {}
-
-impl FromConfig for Socket {
-    type ConfigType = SocketConnection;
-
-    fn from_config(config: Self::ConfigType) -> Res<Self>
-    where
-        Self: Sized,
-    {
-        if config.baud.is_some() {
-            Self::new_serial(config)
-        } else {
-            Self::new(config)
-        }
-    }
-}

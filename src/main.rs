@@ -1,4 +1,4 @@
-use KMCU::{FromConfig, PrinterConfig, PrinterRuntime, Res};
+use KMCU::{PrinterConfig, PrinterRuntime, Res};
 use log::info;
 
 fn main() {

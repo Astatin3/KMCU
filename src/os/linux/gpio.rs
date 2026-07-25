@@ -1,13 +1,12 @@
 //! GPIO controller for SYSFS
 
-use std::{thread::sleep, time::Duration};
+use std::string::ToString;
 
 use alloc::{format, string::String};
 
 use crate::error::Res;
 
 const GPIO_PREFIX: &str = "/sys/class/gpio";
-// const DELAY: Duration = Duration::from_millis(10);
 
 fn pin_name_to_int(pin_name: &str) -> Option<u32> {
     let first_byte = pin_name.as_bytes()[1];
@@ -69,14 +68,11 @@ impl GPIO {
         // return an error because if already exported
         let _ = set_pin_export(pin_int, true);
 
-        // // The kernel takes a sec to set the pin to export
-        // sleep(DELAY);
-
         // Set the value to out
         set_pin_direction(pin_int, false)?;
 
         // Set to the default value
-        // set_pin_value(pin_int, invert)?;
+        set_pin_value(pin_int, invert)?;
 
         debug!("Initialized GPIO pin '{pin_str}'");
 

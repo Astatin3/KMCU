@@ -5,8 +5,8 @@ pub type Error = alloc::string::String;
 
 #[cfg(feature = "log")]
 macro_rules! err {
-    ($msg:expr) => {
-        alloc::string::String::from($msg)
+    ($fmt:expr) => {
+        alloc::format!($fmt)
     };
     ($fmt:expr, $($arg:tt)*) => {
         alloc::format!($fmt, $($arg)*)

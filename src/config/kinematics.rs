@@ -1,6 +1,8 @@
 use alloc::string::String;
 use serde::Deserialize;
 
+use crate::units;
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 pub enum Kinematics {
@@ -25,6 +27,7 @@ pub struct GeneralKinematics {
     pub max_accel: u32,
     pub max_z_velocity: u32,
     pub max_z_accel: u32,
+
     pub x_range: [u32; 2],
     pub y_range: [u32; 2],
     pub z_range: [u32; 2],

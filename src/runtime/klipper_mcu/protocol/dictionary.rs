@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use alloc::string::String;
+use alloc::{collections::btree_map::BTreeMap, string::String};
 use serde::{Deserialize, Deserializer, de::Error};
 
 use crate::runtime::klipper_mcu::protocol::command::{RecvCommand, SendCommand};
@@ -110,7 +108,7 @@ impl<'de> Deserialize<'de> for DictionarySend {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let mut dict = DictionarySend::new();
 
-        let map: HashMap<String, i16> = HashMap::deserialize(deserializer)?;
+        let map: BTreeMap<String, i16> = BTreeMap::deserialize(deserializer)?;
         for (fmt, dynamic_id) in &map {
             let name = fmt.split_whitespace().next().unwrap_or(fmt);
 
@@ -216,7 +214,7 @@ impl<'de> Deserialize<'de> for DictionaryRecv {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let mut dict = DictionaryRecv::new();
 
-        let map: HashMap<String, i16> = HashMap::deserialize(deserializer)?;
+        let map: BTreeMap<String, i16> = BTreeMap::deserialize(deserializer)?;
         for (fmt, dynamic_id) in &map {
             let name = fmt.split_whitespace().next().unwrap_or(fmt);
 

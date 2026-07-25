@@ -1,18 +1,16 @@
 use core::cell::RefCell;
-use std::collections::HashMap;
 
-use alloc::{boxed::Box, rc::Rc, string::String};
+use alloc::{boxed::Box, collections::btree_map::BTreeMap, rc::Rc, string::String};
 
 use crate::{
     config::{AxisConfig, CoreXYKinematics},
     error::Res,
-    runtime::axes::DummyAxis,
-    traits::{Axis, FromConfig, MCU},
+    traits::{Axis, MCU},
 };
 
 pub struct CoreXYRuntime {
     config: CoreXYKinematics,
-    mcus: HashMap<String, Rc<RefCell<dyn MCU>>>,
+    mcus: BTreeMap<String, Rc<RefCell<dyn MCU>>>,
 
     axis_x: Box<dyn Axis>,
     axis_y: Box<dyn Axis>,
@@ -30,16 +28,14 @@ impl CoreXYRuntime {
 
         Ok(())
     }
-}
 
-impl FromConfig for CoreXYRuntime {
-    type ConfigType = (
-        CoreXYKinematics,
-        HashMap<String, AxisConfig>,
-        HashMap<String, Rc<RefCell<dyn MCU>>>,
-    );
-
-    fn from_config((config, mut axes, mcus): Self::ConfigType) -> Res<Self>
+    pub fn from_config(
+        (config, mut axes, mcus): (
+            CoreXYKinematics,
+            BTreeMap<String, AxisConfig>,
+            BTreeMap<String, Rc<RefCell<dyn MCU>>>,
+        ),
+    ) -> Res<Self>
     where
         Self: Sized,
     {
@@ -56,8 +52,7 @@ impl FromConfig for CoreXYRuntime {
                 .ok_or(err!("Could not find axis by name of {axis_name}"))?;
 
             let axis = match axis_config {
-                AxisConfig::Dummy(dummy_axis_config) => DummyAxis::new(dummy_axis_config),
-
+                // AxisConfig::Dummy(dummy_axis_config) => DummyAxis::new(dummy_axis_config),
                 _ => todo!(),
             };
 

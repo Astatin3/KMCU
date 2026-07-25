@@ -1,8 +1,4 @@
-use crate::{
-    config::SimMCUConfig,
-    error::Res,
-    traits::{FromConfig, MCU},
-};
+use crate::{config::SimMCUConfig, error::Res, traits::MCU};
 
 pub struct SimMCURuntime {
     // axes: HashMap<String, Box<dyn Axis>>,
@@ -14,10 +10,8 @@ impl MCU for SimMCURuntime {
     }
 }
 
-impl FromConfig for SimMCURuntime {
-    type ConfigType = SimMCUConfig;
-
-    fn from_config(_config: SimMCUConfig) -> Res<Self>
+impl SimMCURuntime {
+    pub fn from_config(_config: SimMCUConfig) -> Res<Self>
     where
         Self: Sized,
     {

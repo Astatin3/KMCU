@@ -1,19 +1,34 @@
-// #![no_std]
+#![no_std]
+#![allow(nonstandard_style)]
 #![allow(unused)]
 
+// In case we need STD for platform-specific purposes
+#[cfg(feature = "std")]
+extern crate std;
+
+// We ALWAYS need alloc for klipper
 extern crate alloc;
 
+// Add the log macros everywhere
 #[macro_use]
 extern crate log;
 
+// The UOM units macros require this
+#[macro_use]
+extern crate uom;
+
+// Add the err! macro everywhere mimicking anyhow::anyhow!
 #[macro_use]
 mod error;
 
 mod config;
-mod connections;
 mod gcode;
+mod os;
+mod pin;
 mod runtime;
 mod vlq;
+
+mod units;
 
 mod traits {
     mod axis;
@@ -24,11 +39,8 @@ mod traits {
 
     pub use axis::Axis;
     pub use binary::Binary;
-    pub use from_config::FromConfig;
     pub use mcu::MCU;
     pub use stream::{Read, Stream, Write};
 }
 
-pub use crate::{
-    config::PrinterConfig, error::Res, runtime::printer_runtime::PrinterRuntime, traits::FromConfig,
-};
+pub use crate::{config::PrinterConfig, error::Res, runtime::printer_runtime::PrinterRuntime};

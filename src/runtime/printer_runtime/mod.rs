@@ -1,10 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use core::cell::RefCell;
+
+use alloc::{collections::btree_map::BTreeMap, rc::Rc};
 
 use crate::{
     config::{Kinematics, MCUConfig, PrinterConfig},
     error::Res,
-    runtime::{core_xy::CoreXYRuntime, klipper_mcu::KlipperMCURuntime, sim_mcu::SimMCURuntime},
-    traits::{FromConfig, MCU},
+    runtime::{core_xy::CoreXYRuntime, dummy::SimMCURuntime, klipper_mcu::KlipperMCURuntime},
+    traits::MCU,
 };
 
 pub struct PrinterRuntime {
@@ -15,16 +17,12 @@ impl PrinterRuntime {
     pub fn alive(&self) -> Res<()> {
         self.kinematics.alive()
     }
-}
 
-impl FromConfig for PrinterRuntime {
-    type ConfigType = PrinterConfig;
-
-    fn from_config(config: Self::ConfigType) -> Res<Self>
+    pub fn from_config(config: PrinterConfig) -> Res<Self>
     where
         Self: Sized,
     {
-        let mut mcus = HashMap::with_capacity(config.mcu.len());
+        let mut mcus = BTreeMap::new(); // with_capacity(config.mcu.len());
 
         for (name, mcu_config) in config.mcu {
             debug!("Initializing runtime '{name}'");
@@ -35,9 +33,8 @@ impl FromConfig for PrinterRuntime {
                         as Rc<RefCell<dyn MCU>>
                 }
                 MCUConfig::Klipper(klipper_mcuconfig) => Rc::new(RefCell::new(
-                    KlipperMCURuntime::from_config(klipper_mcuconfig).map_err(|e| {
-                        err!("Failed to start Klipper MCU '{name}': {e}")
-                    })?,
+                    KlipperMCURuntime::from_config(klipper_mcuconfig)
+                        .map_err(|e| err!("Failed to start Klipper MCU '{name}': {e}"))?,
                 )) as Rc<RefCell<dyn MCU>>,
             };
 

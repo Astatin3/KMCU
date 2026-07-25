@@ -13,7 +13,7 @@
 //!    e.g. `from_str::<Command>("G1 X10 Y20")` where
 //!    `enum Command { G1(Move), G28(Home), .. }`.
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 use serde::Deserialize;

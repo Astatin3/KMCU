@@ -96,7 +96,11 @@ impl Binary for Vec<u8> {
     fn decode(reader: &mut dyn Read, _: &()) -> Res<Self> {
         let mut len = [0u8; 1];
         reader.read_exact(&mut len)?;
-        let mut buf = vec![0u8; len[0] as usize];
+
+        let len = len[0] as usize;
+        let mut buf = Vec::with_capacity(len);
+        buf.resize(len, 0);
+
         reader.read_exact(&mut buf)?;
         Ok(buf)
     }

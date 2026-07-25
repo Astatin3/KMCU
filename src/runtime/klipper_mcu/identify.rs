@@ -1,6 +1,7 @@
-use std::collections::HashMap;
-
+use alloc::collections::btree_map::BTreeMap;
 use alloc::string::String;
+use heapless::Vec;
+use miniz_oxide::inflate::{decompress_to_vec_with_limit, decompress_to_vec_zlib};
 use serde::Deserialize;
 
 use crate::error::Res;
@@ -8,6 +9,7 @@ use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
     protocol::{DictionaryRecv, DictionarySend, RecvCommand, SendCommand},
 };
+use crate::traits::Read;
 
 #[derive(Deserialize)]
 pub struct IdentifyResults {
@@ -15,8 +17,8 @@ pub struct IdentifyResults {
     pub version: String,
     pub build_versions: String,
     pub license: String,
-    pub config: HashMap<String, serde_json::Value>,
-    pub enumerations: HashMap<String, HashMap<String, serde_json::Value>>,
+    pub config: BTreeMap<String, serde_json::Value>,
+    pub enumerations: BTreeMap<String, BTreeMap<String, serde_json::Value>>,
 
     pub commands: DictionarySend,
     pub responses: DictionaryRecv,
@@ -29,8 +31,8 @@ impl IdentifyResults {
             version: String::new(),
             build_versions: String::new(),
             license: String::new(),
-            config: HashMap::new(),
-            enumerations: HashMap::new(),
+            config: BTreeMap::new(),
+            enumerations: BTreeMap::new(),
 
             commands: DictionarySend::default_dict(),
             responses: DictionaryRecv::default_dict(),
@@ -38,10 +40,11 @@ impl IdentifyResults {
     }
 
     pub fn from_zlib_bytes(zlib_bytes: &[u8]) -> Res<Self> {
-        let mut z = flate2::read::ZlibDecoder::new(zlib_bytes);
-        let mut s = String::new();
-        std::io::Read::read_to_string(&mut z, &mut s)
-            .map_err(|e| err!("Failed to read zlib data: {e}"))?;
+        let decompressed =
+            decompress_to_vec_zlib(zlib_bytes).map_err(|e| err!("Failed to decompress: {e}"))?;
+
+        let mut s =
+            String::from_utf8(decompressed).map_err(|e| err!("Failed to decompress: {e}"))?;
 
         debug!("Got klipper string: {s}");
 
@@ -59,7 +62,7 @@ impl KlipperMCURuntime {
     /// dictionaries).
     pub fn identify(&mut self) -> Res<IdentifyResults> {
         let mut i = 0;
-        let mut zlib_bytes = Vec::new();
+        let mut zlib_bytes = Vec::<_, 4096>::new(); // 4 KB should be enough memory to store the JSON
 
         loop {
             let byte_start = (i * IDENTIFY_COUNT) as u32;

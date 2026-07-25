@@ -1,5 +1,3 @@
-use std::io::Cursor;
-
 use crate::error::Res;
 use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
