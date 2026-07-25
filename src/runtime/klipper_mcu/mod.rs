@@ -26,7 +26,7 @@ use protocol::dictionary::DictionarySend;
 
 pub struct KlipperMCURuntime {
     pub stream: Box<dyn Stream>,
-    pub seq: usize,
+    pub seq: u8,
 
     pub power_pin: Option<GPIO>,
 

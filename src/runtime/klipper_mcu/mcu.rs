@@ -7,12 +7,12 @@ use crate::{
 
 impl MCU for KlipperMCURuntime {
     fn alive(&mut self) -> anyhow::Result<()> {
-        self.send_command(&SendCommand::identify {
+        self.send_command(SendCommand::identify {
             offset: 0,
             count: 0,
         });
 
-        self.recv_frame()?;
+        self.recv_frame_or_ack()?;
 
         Ok(())
     }

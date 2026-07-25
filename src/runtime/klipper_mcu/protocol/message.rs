@@ -1,14 +1,20 @@
-use crate::traits::Stream;
+use crate::{
+    runtime::klipper_mcu::protocol::{
+        command::{RecvCommand, SendCommand},
+        dictionary::{DictionaryRecv, DictionarySend},
+    },
+    traits::{Binary, Read, Write},
+};
 
 pub const MESSAGE_MIN: usize = 5;
 pub const MESSAGE_MAX: usize = 64;
 pub const MESSAGE_SYNC: u8 = 0x7e;
 pub const MESSAGE_DEST: u8 = 0x10;
 pub const MESSAGE_SEQ_MASK: u8 = 0x0f;
-const MESSAGE_HEADER_SIZE: usize = 2;
+pub(crate) const MESSAGE_HEADER_SIZE: usize = 2;
 const MESSAGE_TRAILER_SIZE: usize = 3;
 
-fn compose_sequence_number(seq: u8) -> u8 {
+pub(crate) fn compose_sequence_number(seq: u8) -> u8 {
     (seq & MESSAGE_SEQ_MASK) | MESSAGE_DEST
 }
 
@@ -16,109 +22,192 @@ fn decompose_sequence_number(composed: u8) -> u8 {
     composed & MESSAGE_SEQ_MASK
 }
 
-fn crc16_ccitt(buf: &[u8]) -> [u8; 2] {
+fn crc16_update(mut crc: u16, byte: u8) -> u16 {
+    let mut data: u16 = byte as u16;
+    data ^= crc & 0xff;
+    data ^= (data & 0x0f) << 4;
+    crc = ((data << 8) | (crc >> 8)) ^ (data >> 4) ^ (data << 3);
+    crc
+}
+
+pub(crate) fn crc16_ccitt(buf: &[u8]) -> [u8; 2] {
     let mut crc: u16 = 0xffff;
     for &byte in buf {
-        let mut data: u16 = byte as u16;
-        data ^= crc & 0xff;
-        data ^= (data & 0x0f) << 4;
-        crc = ((data << 8) | (crc >> 8)) ^ (data >> 4) ^ (data << 3);
+        crc = crc16_update(crc, byte);
     }
     [(crc >> 8) as u8, (crc & 0xff) as u8]
 }
 
-#[derive(Debug, Clone)]
+/// A writer wrapper that computes CRC16-CCITT on the fly as bytes pass through.
+pub(crate) struct CrcWriter<'a> {
+    inner: &'a mut dyn Write,
+    crc: u16,
+}
+
+impl<'a> CrcWriter<'a> {
+    pub fn new(inner: &'a mut dyn Write) -> Self {
+        Self { inner, crc: 0xffff }
+    }
+
+    pub fn finish(self) -> (&'a mut dyn Write, [u8; 2]) {
+        (self.inner, [(self.crc >> 8) as u8, (self.crc & 0xff) as u8])
+    }
+}
+
+impl Write for CrcWriter<'_> {
+    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
+        for &byte in buf {
+            self.crc = crc16_update(self.crc, byte);
+        }
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> anyhow::Result<()> {
+        self.inner.flush()
+    }
+}
+
 pub struct Frame {
-    raw: Vec<u8>,
+    pub(crate) seq: u8,
+    pub(crate) payload: FramePayload,
+}
+
+pub(crate) enum FramePayload {
+    Empty,
+    SendCommand(SendCommand),
+    RecvCommand(RecvCommand),
+}
+
+impl FramePayload {
+    fn size(&self, dict: &DictionarySend) -> usize {
+        match self {
+            FramePayload::Empty => 0,
+            FramePayload::SendCommand(send_command) => send_command.size(dict),
+            FramePayload::RecvCommand(recv_command) => recv_command.size(dict),
+        }
+    }
 }
 
 impl Frame {
-    /// Build a new Frame from a payload and sequence number.
-    pub fn new(payload: &[u8], seq: u8) -> Option<Self> {
-        let payload_len = payload.len();
-        let length = payload_len + MESSAGE_MIN;
-        if length > MESSAGE_MAX {
-            return None;
-        }
-
-        let composed = compose_sequence_number(seq);
-
-        let mut buf = Vec::with_capacity(length);
-        buf.push(length as u8);
-        buf.push(composed);
-        buf.extend_from_slice(payload);
-
-        let crc = crc16_ccitt(&buf);
-        buf.extend_from_slice(&crc);
-        buf.push(MESSAGE_SYNC);
-
-        Some(Self { raw: buf })
-    }
-
-    /// Write the raw frame bytes to a stream.
-    pub fn write_to(&self, writer: &mut dyn Stream) -> anyhow::Result<()> {
-        writer
-            .write_all(&self.raw)
-            .map_err(|e| anyhow::anyhow!("Failed to write frame: {e}"))
-    }
-
-    /// Read a single valid frame from a byte stream.
-    ///
-    /// Uses sync-anchored validation: scans for `0x7e` sync bytes, then
-    /// checks if the length byte and CRC are consistent at that position.
-    /// Stale/garbage bytes before the frame are silently discarded.
-    pub fn read_from(reader: &mut dyn Stream) -> anyhow::Result<Self> {
-        let mut buf = Vec::with_capacity(MESSAGE_MAX * 2);
-        let mut tmp = [0u8; MESSAGE_MAX];
-
-        loop {
-            // Try to find a frame in whatever we have so far.
-            if let Some((frame_start, frame_len)) = find_frame(&buf) {
-                let frame_bytes = buf[frame_start..frame_start + frame_len].to_vec();
-                if frame_start > 0 {
-                    trace!("Discarded {} stale bytes", frame_start);
-                }
-                return Ok(Self { raw: frame_bytes });
-            }
-
-            // No complete frame yet — read more data.
-            match reader.read(&mut tmp) {
-                Ok(0) => anyhow::bail!("Connection closed"),
-                Ok(n) => {
-                    buf.extend_from_slice(&tmp[..n]);
-                    trace!("read_from: read {} bytes, buf={} bytes", n, buf.len());
-                }
-                Err(e) => return Err(e.into()),
-            }
-
-            // No complete frame yet. If buffer is getting large, trim garbage.
-            if buf.len() >= MESSAGE_MAX * 2 {
-                let trim = buf.len() - MESSAGE_MAX;
-                buf.drain(..trim);
-                trace!("Buffer overflow, discarded {} bytes", trim);
-            }
+    pub fn send(seq: u8, cmd: SendCommand) -> Frame {
+        Frame {
+            seq,
+            payload: FramePayload::SendCommand(cmd),
         }
     }
 
     /// Sequence number from the frame header.
     pub fn seq(&self) -> u8 {
-        decompose_sequence_number(self.raw[1])
+        self.seq
     }
 
-    /// The payload bytes (between header and trailer).
-    pub fn payload(&self) -> &[u8] {
-        let len = self.raw.len();
-        &self.raw[MESSAGE_HEADER_SIZE..len - MESSAGE_TRAILER_SIZE]
-    }
+    // /// The payload bytes (between header and trailer).
+    // pub fn payload(&self) -> &[u8] {
+    //     &self.buf[MESSAGE_HEADER_SIZE..self.len - MESSAGE_TRAILER_SIZE]
+    // }
 
     /// True if the payload is empty (ACK/NAK).
     pub fn is_empty(&self) -> bool {
-        self.payload().is_empty()
+        if let FramePayload::Empty = self.payload {
+            false
+        } else {
+            true
+        }
+    }
+}
+
+impl Binary for Frame {
+    type EncodeArg = DictionarySend;
+    type DecodeArg = DictionaryRecv;
+
+    fn encode(&self, writer: &mut dyn Write, dict: &DictionarySend) -> anyhow::Result<()> {
+        if let FramePayload::SendCommand(cmd) = &self.payload {
+            let mut writer = CrcWriter::new(writer);
+
+            // Starting size
+            let size = self.size(dict) as u8;
+            size.encode(&mut writer, &())?;
+
+            // Sequence byte
+            let seq = compose_sequence_number(self.seq);
+            seq.encode(&mut writer, &())?;
+
+            // The message data
+            cmd.encode(&mut writer, dict)?;
+
+            // Finish calculating the CRC
+            let (mut writer, crc) = writer.finish();
+
+            // add CRC checksum
+            crc[0].encode(writer, &());
+            crc[1].encode(writer, &());
+
+            // The ending magic byte
+            MESSAGE_SYNC.encode(writer, &());
+        } else {
+            unreachable!()
+        }
+
+        Ok(())
     }
 
-    /// Consume the frame and return the raw wire bytes.
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.raw
+    fn decode(reader: &mut dyn Read, dict: &DictionaryRecv) -> anyhow::Result<Self> {
+        let mut buf = [0u8; MESSAGE_MAX];
+        let mut scan_len = 0usize;
+
+        loop {
+            if let Some((start, frame_len)) = find_frame(&buf[..scan_len]) {
+                if start > 0 {
+                    trace!("Discarded {} stale bytes", start);
+                }
+
+                let seq = decompose_sequence_number(buf[start + 1]);
+                let payload_start = start + MESSAGE_HEADER_SIZE;
+                let payload_end = start + frame_len - MESSAGE_TRAILER_SIZE;
+                let payload = &buf[payload_start..payload_end];
+
+                if payload.is_empty() {
+                    return Ok(Self {
+                        seq,
+                        payload: FramePayload::Empty,
+                    });
+                }
+
+                let mut cursor = payload;
+                let cmd = RecvCommand::decode(&mut cursor, dict)?;
+                trace!("Received command '{cmd:?}'");
+
+                return Ok(Self {
+                    seq,
+                    payload: FramePayload::RecvCommand(cmd),
+                });
+            }
+
+            // Try to fill the buffer
+            let space = &mut buf[scan_len..];
+            match reader.read(space) {
+                Ok(0) => anyhow::bail!("Connection closed"),
+                Ok(n) => {
+                    scan_len += n;
+                }
+                Err(e) => return Err(e.into()),
+            }
+
+            // Buffer full and no frame found — drop everything before the first sync byte
+            if scan_len >= MESSAGE_MAX {
+                if let Some(pos) = buf[..scan_len].iter().position(|&b| b == MESSAGE_SYNC) {
+                    let keep = scan_len - pos;
+                    buf.copy_within(pos..scan_len, 0);
+                    scan_len = keep;
+                } else {
+                    scan_len = 0;
+                }
+            }
+        }
+    }
+
+    fn size(&self, dict: &DictionarySend) -> usize {
+        self.payload.size(dict) + MESSAGE_MIN
     }
 }
 

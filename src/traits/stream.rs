@@ -24,7 +24,6 @@ pub trait Read {
                 Ok(n) => unsafe {
                     buf.set_len(buf.len() + n);
                 },
-                Err(ref e) if is_interrupted(e) => continue,
                 Err(e) => return Err(e),
             }
         }
@@ -48,14 +47,9 @@ pub trait Read {
         while pos < buf.len() {
             match self.read(&mut buf[pos..]) {
                 Ok(0) => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::UnexpectedEof,
-                        "failed to fill whole buffer",
-                    )
-                    .into());
+                    return Err(anyhow::anyhow!("failed to fill whole buffer"));
                 }
                 Ok(n) => pos += n,
-                Err(ref e) if is_interrupted(e) => continue,
                 Err(e) => return Err(e),
             }
         }
@@ -82,14 +76,9 @@ pub trait Write {
         while !buf.is_empty() {
             match self.write(buf) {
                 Ok(0) => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::WriteZero,
-                        "failed to write whole buffer",
-                    )
-                    .into());
+                    return Err(anyhow::anyhow!("failed to fill whole buffer"));
                 }
                 Ok(n) => buf = &buf[n..],
-                Err(ref e) if is_interrupted(e) => continue,
                 Err(e) => return Err(e),
             }
         }
@@ -130,51 +119,12 @@ pub trait Write {
     }
 }
 
-fn is_interrupted(e: &anyhow::Error) -> bool {
-    e.downcast_ref::<std::io::Error>()
-        .map_or(false, |e| e.kind() == std::io::ErrorKind::Interrupted)
-}
-
-impl<T: std::io::Read> Read for T {
+impl Read for &[u8] {
     fn read(&mut self, buf: &mut [u8]) -> anyhow::Result<usize> {
-        Ok(std::io::Read::read(self, buf)?)
-    }
-
-    fn is_read_vectored(&self) -> bool {
-        false
-    }
-
-    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> anyhow::Result<usize> {
-        Ok(std::io::Read::read_to_end(self, buf)?)
-    }
-
-    fn read_to_string(&mut self, buf: &mut String) -> anyhow::Result<usize> {
-        Ok(std::io::Read::read_to_string(self, buf)?)
-    }
-
-    fn read_exact(&mut self, buf: &mut [u8]) -> anyhow::Result<()> {
-        Ok(std::io::Read::read_exact(self, buf)?)
-    }
-}
-
-impl<T: std::io::Write> Write for T {
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
-        Ok(std::io::Write::write(self, buf)?)
-    }
-
-    fn flush(&mut self) -> anyhow::Result<()> {
-        Ok(std::io::Write::flush(self)?)
-    }
-
-    fn is_write_vectored(&self) -> bool {
-        false
-    }
-
-    fn write_all(&mut self, buf: &[u8]) -> anyhow::Result<()> {
-        Ok(std::io::Write::write_all(self, buf)?)
-    }
-
-    fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> anyhow::Result<()> {
-        Ok(std::io::Write::write_fmt(self, fmt)?)
+        let amt = buf.len().min(self.len());
+        let (a, b) = self.split_at(amt);
+        buf[..amt].copy_from_slice(a);
+        *self = b;
+        Ok(amt)
     }
 }

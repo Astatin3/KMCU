@@ -1,11 +1,11 @@
 use std::ffi::CString;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{Read as _, Write as _};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::time::{Duration, Instant};
 
 use crate::config::RpmsgConnection;
-use crate::traits::{FromConfig, Stream};
+use crate::traits::{FromConfig, Read, Stream, Write};
 
 const RPMSG_NAME_SIZE: usize = 32;
 const RPMSG_ADDR_ANY: u32 = 0xFFFFFFFF;
@@ -148,21 +148,21 @@ fn io_err_is_recoverable(e: &std::io::Error) -> bool {
 }
 
 impl Read for RpmsgEndpoint {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let fd = self.data_fd.as_mut().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::NotConnected, "RPMSG not connected")
-        })?;
+    fn read(&mut self, buf: &mut [u8]) -> anyhow::Result<usize> {
+        let fd = self
+            .data_fd
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("RPMSG not connected"))?;
 
         match poll_then_read(fd, self.config.timeout, buf) {
             Ok(n) => Ok(n),
             Err(e) if io_err_is_recoverable(&e) => {
                 warn!("RPMSG read failed ({e}), reconnecting");
-                self.reconnect()
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                self.reconnect()?;
                 let fd = self.data_fd.as_mut().unwrap();
-                poll_then_read(fd, self.config.timeout, buf)
+                Ok(poll_then_read(fd, self.config.timeout, buf)?)
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e.into()),
         }
     }
 }
@@ -197,12 +197,9 @@ fn write_with_timeout(
 }
 
 impl Write for RpmsgEndpoint {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
         if self.data_fd.is_none() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotConnected,
-                "RPMSG not connected",
-            ));
+            return Err(anyhow::anyhow!("RPMSG not connected"));
         }
         let deadline = Instant::now() + self.config.timeout;
         let result = write_with_timeout(self.data_fd.as_mut().unwrap(), buf, deadline);
@@ -210,16 +207,19 @@ impl Write for RpmsgEndpoint {
             Ok(n) => Ok(n),
             Err(e) if io_err_is_recoverable(&e) => {
                 warn!("RPMSG write failed ({e}), reconnecting");
-                self.reconnect()
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                self.reconnect()?;
                 let deadline = Instant::now() + self.config.timeout;
-                write_with_timeout(self.data_fd.as_mut().unwrap(), buf, deadline)
+                Ok(write_with_timeout(
+                    self.data_fd.as_mut().unwrap(),
+                    buf,
+                    deadline,
+                )?)
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e.into()),
         }
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> anyhow::Result<()> {
         if let Some(fd) = self.data_fd.as_mut() {
             fd.flush()?;
         }

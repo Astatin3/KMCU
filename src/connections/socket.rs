@@ -1,9 +1,9 @@
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Read as _, Write as _};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
 use crate::config::SocketConnection;
-use crate::traits::FromConfig;
+use crate::traits::{FromConfig, Read, Stream, Write};
 
 pub struct Socket {
     inner: File,
@@ -90,22 +90,20 @@ impl Socket {
 }
 
 impl Read for Socket {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.poll_ready(self.inner.as_raw_fd(), libc::POLLIN)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::TimedOut, e.to_string()))?;
-        self.inner.read(buf)
+    fn read(&mut self, buf: &mut [u8]) -> anyhow::Result<usize> {
+        self.poll_ready(self.inner.as_raw_fd(), libc::POLLIN)?;
+        Ok(std::io::Read::read(&mut self.inner, buf)?)
     }
 }
 
 impl Write for Socket {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.poll_ready(self.inner.as_raw_fd(), libc::POLLOUT)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::TimedOut, e.to_string()))?;
-        self.inner.write(buf)
+    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
+        self.poll_ready(self.inner.as_raw_fd(), libc::POLLOUT)?;
+        Ok(self.inner.write(buf)?)
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.flush()
+    fn flush(&mut self) -> anyhow::Result<()> {
+        Ok(self.inner.flush()?)
     }
 }
 

@@ -1,3 +1,4 @@
+// #![no_std]
 #![allow(unused)]
 
 #[macro_use]
@@ -25,6 +26,8 @@ mod traits {
     pub use mcu::MCU;
     pub use stream::{Read, Stream, Write};
 }
+
+mod error;
 
 pub use crate::{
     config::PrinterConfig, runtime::printer_runtime::PrinterRuntime, traits::FromConfig,

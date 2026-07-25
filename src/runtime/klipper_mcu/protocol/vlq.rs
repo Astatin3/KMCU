@@ -51,44 +51,20 @@ pub fn encode_int_to(v: u32, writer: &mut dyn Write) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Encode a 32-bit unsigned integer as a variable length quantity (VLQ).
-/// Returns a Vec<u8> containing the encoded bytes.
-pub fn encode_int(v: u32) -> Vec<u8> {
+/// Return the number of bytes `encode_int_to` would write for the given value.
+pub fn vlq_int_size(v: u32) -> usize {
     let sv = v as i32;
-    let mut buf = Vec::with_capacity(5);
-
     if sv < (3 << 5) && sv >= -(1 << 5) {
-        buf.push((v & 0x7f) as u8);
-        return buf;
+        1
+    } else if sv < (3 << 12) && sv >= -(1 << 12) {
+        2
+    } else if sv < (3 << 19) && sv >= -(1 << 19) {
+        3
+    } else if sv < (3 << 26) && sv >= -(1 << 26) {
+        4
+    } else {
+        5
     }
-
-    if sv < (3 << 12) && sv >= -(1 << 12) {
-        buf.push(((v >> 7) & 0x7f) as u8 | 0x80);
-        buf.push((v & 0x7f) as u8);
-        return buf;
-    }
-
-    if sv < (3 << 19) && sv >= -(1 << 19) {
-        buf.push(((v >> 14) & 0x7f) as u8 | 0x80);
-        buf.push(((v >> 7) & 0x7f) as u8 | 0x80);
-        buf.push((v & 0x7f) as u8);
-        return buf;
-    }
-
-    if sv < (3 << 26) && sv >= -(1 << 26) {
-        buf.push(((v >> 21) & 0x7f) as u8 | 0x80);
-        buf.push(((v >> 14) & 0x7f) as u8 | 0x80);
-        buf.push(((v >> 7) & 0x7f) as u8 | 0x80);
-        buf.push((v & 0x7f) as u8);
-        return buf;
-    }
-
-    buf.push(((v >> 28) & 0x7f) as u8 | 0x80);
-    buf.push(((v >> 21) & 0x7f) as u8 | 0x80);
-    buf.push(((v >> 14) & 0x7f) as u8 | 0x80);
-    buf.push(((v >> 7) & 0x7f) as u8 | 0x80);
-    buf.push((v & 0x7f) as u8);
-    buf
 }
 
 /// Decode a VLQ-encoded integer from a reader.
@@ -116,20 +92,6 @@ pub fn encode_msgid_to(encoded_msgid: i16, writer: &mut dyn Write) -> anyhow::Re
     }
     writer.write_all(&[(v & 0x7f) as u8])?;
     Ok(())
-}
-
-/// Encode a message ID (up to 16 bits) into a variable-length format.
-/// Returns a Vec<u8> containing the encoded bytes (1 or 2 bytes).
-pub fn encode_msgid(encoded_msgid: i16) -> Vec<u8> {
-    let v = encoded_msgid as u16;
-    let mut buf = Vec::with_capacity(2);
-
-    if v >= 0x80 {
-        buf.push(((v >> 7) & 0x7f) as u8 | 0x80);
-    }
-    buf.push((v & 0x7f) as u8);
-
-    buf
 }
 
 /// Decode a variable-length encoded message ID from a reader.

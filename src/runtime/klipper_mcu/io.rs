@@ -1,49 +1,40 @@
+use std::io::Cursor;
+
 use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
     protocol::{
         command::{RecvCommand, SendCommand},
-        message::Frame,
+        message::{
+            CrcWriter, Frame, FramePayload, MESSAGE_MAX, MESSAGE_MIN, MESSAGE_SYNC,
+            compose_sequence_number,
+        },
     },
 };
-use crate::traits::Binary;
+use crate::traits::{Binary, Write};
 
 impl KlipperMCURuntime {
-    pub fn send_command(&mut self, command: &SendCommand) -> anyhow::Result<()> {
+    pub fn send_command(&mut self, command: SendCommand) -> anyhow::Result<()> {
         trace!("Sent command '{command:?}'");
 
-        let mut payload = Vec::with_capacity(64);
-        command.encode(&mut payload, &self.identity.commands)?;
+        let frame = Frame::send(self.seq, command);
+        frame.encode(&mut *self.stream, &self.identity.commands)?;
 
-        let seq = (self.seq % 16) as u8;
-        let frame =
-            Frame::new(&payload, seq).ok_or_else(|| anyhow::anyhow!("Message too large"))?;
-
-        frame
-            .write_to(&mut *self.stream)
-            .map_err(|e| anyhow::anyhow!("Failed to send: {e}"))
+        Ok(())
     }
 
-    /// Receive some frame data
-    pub(crate) fn recv_frame(&mut self) -> anyhow::Result<Frame> {
-        let frame = Frame::read_from(&mut *self.stream)?;
-        self.seq = frame.seq() as usize;
-        Ok(frame)
-    }
-
-    /// Receive a command that's potentially blank
+    /// Receive a frame and decode its payload as a command, or `None` for an ACK/NAK.
     pub fn recv_frame_or_ack(&mut self) -> anyhow::Result<Option<RecvCommand>> {
-        let frame = self.recv_frame()?;
+        let frame = Frame::decode(&mut *self.stream, &self.identity.responses)?;
+        self.seq = frame.seq();
 
-        if frame.is_empty() {
-            return Ok(None);
+        match frame.payload {
+            FramePayload::Empty => Ok(None),
+            FramePayload::RecvCommand(cmd) => {
+                trace!("Received command '{cmd:?}'");
+                Ok(Some(cmd))
+            }
+            FramePayload::SendCommand(_) => unreachable!(),
         }
-
-        let mut cursor = frame.payload();
-        let cmd = RecvCommand::decode(&mut cursor, &self.identity.responses)?;
-
-        trace!("Received command '{cmd:?}'");
-
-        Ok(Some(cmd))
     }
 
     /// Receive a command but expect it to not be blank

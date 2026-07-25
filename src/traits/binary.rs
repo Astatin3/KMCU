@@ -6,6 +6,7 @@ pub trait Binary: Sized {
 
     fn encode(&self, writer: &mut dyn Write, arg: &Self::EncodeArg) -> anyhow::Result<()>;
     fn decode(reader: &mut dyn Read, arg: &Self::DecodeArg) -> anyhow::Result<Self>;
+    fn size(&self, arg: &Self::EncodeArg) -> usize;
 }
 
 macro_rules! binary_vlq_unsigned {
@@ -21,6 +22,10 @@ macro_rules! binary_vlq_unsigned {
             fn decode(reader: &mut dyn Read, _: &()) -> anyhow::Result<Self> {
                 let v = crate::runtime::klipper_mcu::protocol::vlq::parse_int(reader)?;
                 Ok(v as $t)
+            }
+
+            fn size(&self, _: &()) -> usize {
+                crate::runtime::klipper_mcu::protocol::vlq::vlq_int_size(*self as u32)
             }
         }
     };
@@ -39,6 +44,10 @@ macro_rules! binary_vlq_signed {
             fn decode(reader: &mut dyn Read, _: &()) -> anyhow::Result<Self> {
                 let v = crate::runtime::klipper_mcu::protocol::vlq::parse_int(reader)?;
                 Ok(v as $t)
+            }
+
+            fn size(&self, _: &()) -> usize {
+                crate::runtime::klipper_mcu::protocol::vlq::vlq_int_size(*self as u32)
             }
         }
     };
@@ -63,6 +72,10 @@ impl Binary for u8 {
         reader.read_exact(&mut buf)?;
         Ok(buf[0])
     }
+
+    fn size(&self, _: &()) -> usize {
+        1
+    }
 }
 
 impl Binary for Vec<u8> {
@@ -81,5 +94,9 @@ impl Binary for Vec<u8> {
         let mut buf = vec![0u8; len[0] as usize];
         reader.read_exact(&mut buf)?;
         Ok(buf)
+    }
+
+    fn size(&self, _: &()) -> usize {
+        self.len() + 1
     }
 }

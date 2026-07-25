@@ -63,7 +63,7 @@ impl KlipperMCURuntime {
         loop {
             let byte_start = (i * IDENTIFY_COUNT) as u32;
 
-            self.send_command(&SendCommand::identify {
+            self.send_command(SendCommand::identify {
                 offset: byte_start,
                 count: IDENTIFY_COUNT as u8,
             })?;

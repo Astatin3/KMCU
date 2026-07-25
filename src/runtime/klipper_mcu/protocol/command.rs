@@ -72,6 +72,21 @@ macro_rules! command {
                     stringify!($ename)
                 ))
             }
+
+            fn size(&self, dict: &DictionarySend) -> usize {
+                match self {
+                    $(
+                        $ename::$vname $( { $($fname),* } )? => {
+                            let dynamic_id = dict.get_dynamic_id($id).unwrap_or(0);
+                            let mut total = <i16 as Binary>::size(&dynamic_id, &());
+                            $(
+                                $( total += <$fty as Binary>::size($fname, &()); )*
+                            )?
+                            total
+                        }
+                    )*
+                }
+            }
         }
 
         impl $ename {
