@@ -1,5 +1,6 @@
 use crate::{
     config::SimMCUConfig,
+    error::Res,
     traits::{FromConfig, MCU},
 };
 
@@ -8,7 +9,7 @@ pub struct SimMCURuntime {
 }
 
 impl MCU for SimMCURuntime {
-    fn alive(&mut self) -> anyhow::Result<()> {
+    fn alive(&mut self) -> Res<()> {
         Ok(())
     }
 }
@@ -16,7 +17,7 @@ impl MCU for SimMCURuntime {
 impl FromConfig for SimMCURuntime {
     type ConfigType = SimMCUConfig;
 
-    fn from_config(_config: SimMCUConfig) -> anyhow::Result<Self>
+    fn from_config(_config: SimMCUConfig) -> Res<Self>
     where
         Self: Sized,
     {

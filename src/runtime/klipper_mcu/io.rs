@@ -1,5 +1,6 @@
 use std::io::Cursor;
 
+use crate::error::Res;
 use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
     protocol::{
@@ -13,7 +14,7 @@ use crate::runtime::klipper_mcu::{
 use crate::traits::{Binary, Write};
 
 impl KlipperMCURuntime {
-    pub fn send_command(&mut self, command: SendCommand) -> anyhow::Result<()> {
+    pub fn send_command(&mut self, command: SendCommand) -> Res<()> {
         trace!("Sent command '{command:?}'");
 
         let frame = Frame::send(self.seq, command);
@@ -23,7 +24,7 @@ impl KlipperMCURuntime {
     }
 
     /// Receive a frame and decode its payload as a command, or `None` for an ACK/NAK.
-    pub fn recv_frame_or_ack(&mut self) -> anyhow::Result<Option<RecvCommand>> {
+    pub fn recv_frame_or_ack(&mut self) -> Res<Option<RecvCommand>> {
         let frame = Frame::decode(&mut *self.stream, &self.identity.responses)?;
         self.seq = frame.seq();
 
@@ -38,10 +39,10 @@ impl KlipperMCURuntime {
     }
 
     /// Receive a command but expect it to not be blank
-    pub fn recv_command(&mut self) -> anyhow::Result<RecvCommand> {
+    pub fn recv_command(&mut self) -> Res<RecvCommand> {
         match self.recv_frame_or_ack() {
             Ok(Some(cmd)) => Ok(cmd),
-            Ok(None) => Err(anyhow::anyhow!("Unexpected blank command")),
+            Ok(None) => Err(err!("Unexpected blank command")),
             Err(e) => Err(e),
         }
     }

@@ -1,9 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use anyhow::anyhow;
-
 use crate::{
     config::{AxisConfig, CoreXYKinematics},
+    error::Res,
     runtime::axes::DummyAxis,
     traits::{Axis, FromConfig, MCU},
 };
@@ -19,11 +18,11 @@ pub struct CoreXYRuntime {
 }
 
 impl CoreXYRuntime {
-    pub fn alive(&self) -> anyhow::Result<()> {
+    pub fn alive(&self) -> Res<()> {
         for (name, mcu) in &self.mcus {
             mcu.borrow_mut()
                 .alive()
-                .map_err(|e| anyhow::anyhow!("Failed to run alive check for MCU '{name}': {e}"))?;
+                .map_err(|e| err!("Failed to run alive check for MCU '{name}': {e}"))?;
         }
 
         Ok(())
@@ -37,21 +36,21 @@ impl FromConfig for CoreXYRuntime {
         HashMap<String, Rc<RefCell<dyn MCU>>>,
     );
 
-    fn from_config((config, mut axes, mcus): Self::ConfigType) -> anyhow::Result<Self>
+    fn from_config((config, mut axes, mcus): Self::ConfigType) -> Res<Self>
     where
         Self: Sized,
     {
-        let mut create_axis = |names: &(String, String)| -> anyhow::Result<Box<dyn Axis>> {
+        let mut create_axis = |names: &(String, String)| -> Res<Box<dyn Axis>> {
             let (mcu_name, axis_name) = names;
 
             let mcu = mcus
                 .get(mcu_name)
-                .ok_or(anyhow!("Could not find MCU by name of {mcu_name}"))?
+                .ok_or(err!("Could not find MCU by name of {mcu_name}"))?
                 .clone();
 
             let axis_config = axes
                 .remove(axis_name)
-                .ok_or(anyhow!("Could not find axis by name of {axis_name}"))?;
+                .ok_or(err!("Could not find axis by name of {axis_name}"))?;
 
             let axis = match axis_config {
                 AxisConfig::Dummy(dummy_axis_config) => DummyAxis::new(dummy_axis_config),

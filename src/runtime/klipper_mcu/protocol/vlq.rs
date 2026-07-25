@@ -1,15 +1,15 @@
 // "Variable length quantity" derived from https://github.com/Klipper3d/klipper/blob/c707dd19214709dc23684b254a68e3bf69e4cfb3/src/command.c
 
-use crate::traits::{Read, Write};
+use crate::{error::Res, traits::{Read, Write}};
 
-fn read_byte(reader: &mut dyn Read) -> anyhow::Result<u8> {
+fn read_byte(reader: &mut dyn Read) -> Res<u8> {
     let mut buf = [0u8; 1];
     reader.read_exact(&mut buf)?;
     Ok(buf[0])
 }
 
 /// Encode a 32-bit unsigned integer as a variable length quantity (VLQ) into a writer.
-pub fn encode_int_to(v: u32, writer: &mut dyn Write) -> anyhow::Result<()> {
+pub fn encode_int_to(v: u32, writer: &mut dyn Write) -> Res<()> {
     let sv = v as i32;
 
     if sv < (3 << 5) && sv >= -(1 << 5) {
@@ -68,7 +68,7 @@ pub fn vlq_int_size(v: u32) -> usize {
 }
 
 /// Decode a VLQ-encoded integer from a reader.
-pub fn parse_int(reader: &mut dyn Read) -> anyhow::Result<u32> {
+pub fn parse_int(reader: &mut dyn Read) -> Res<u32> {
     let mut c = read_byte(reader)?;
     let mut v = (c & 0x7f) as u32;
 
@@ -85,7 +85,7 @@ pub fn parse_int(reader: &mut dyn Read) -> anyhow::Result<u32> {
 }
 
 /// Encode a message ID (up to 16 bits) into a variable-length format in a writer.
-pub fn encode_msgid_to(encoded_msgid: i16, writer: &mut dyn Write) -> anyhow::Result<()> {
+pub fn encode_msgid_to(encoded_msgid: i16, writer: &mut dyn Write) -> Res<()> {
     let v = encoded_msgid as u16;
     if v >= 0x80 {
         writer.write_all(&[((v >> 7) & 0x7f) as u8 | 0x80])?;
@@ -95,7 +95,7 @@ pub fn encode_msgid_to(encoded_msgid: i16, writer: &mut dyn Write) -> anyhow::Re
 }
 
 /// Decode a variable-length encoded message ID from a reader.
-pub fn parse_msgid(reader: &mut dyn Read) -> anyhow::Result<i16> {
+pub fn parse_msgid(reader: &mut dyn Read) -> Res<i16> {
     let first = read_byte(reader)?;
     let mut msgid = first as u16;
 

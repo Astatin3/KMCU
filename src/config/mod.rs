@@ -11,6 +11,8 @@ pub use kinematics::*;
 pub use mcu::*;
 pub use pin::*;
 
+use crate::error::Res;
+
 use std::{collections::HashMap, time::Duration};
 
 use serde::{Deserialize, Deserializer};
@@ -27,8 +29,8 @@ pub struct PrinterConfig {
 }
 
 impl PrinterConfig {
-    pub fn parse(config_string: &str) -> anyhow::Result<Self> {
-        Ok(toml::from_str(config_string)?)
+    pub fn parse(config_string: &str) -> Res<Self> {
+        toml::from_str(config_string).map_err(|e| err!("{e}"))
     }
 }
 

@@ -2,7 +2,7 @@
 
 use std::{thread::sleep, time::Duration};
 
-use anyhow::anyhow;
+use crate::error::Res;
 
 const GPIO_PREFIX: &str = "/sys/class/gpio";
 // const DELAY: Duration = Duration::from_millis(10);
@@ -22,12 +22,12 @@ fn pin_name_to_int(pin_name: &str) -> Option<u32> {
 }
 
 // Equivalent to 'echo <string> > <filename>'
-fn write_to_file(path: String, data: &str) -> anyhow::Result<()> {
+fn write_to_file(path: String, data: &str) -> Res<()> {
     trace!("Wrote '{data}' to '{path}'");
-    std::fs::write(&path, data).map_err(|e| anyhow!("Failed to write '{data}' to '{path}': {e}"))
+    std::fs::write(&path, data).map_err(|e| err!("Failed to write '{data}' to '{path}': {e}"))
 }
 
-fn set_pin_export(pin_int: u32, export: bool) -> anyhow::Result<()> {
+fn set_pin_export(pin_int: u32, export: bool) -> Res<()> {
     write_to_file(
         format!(
             "{GPIO_PREFIX}/{}",
@@ -37,14 +37,14 @@ fn set_pin_export(pin_int: u32, export: bool) -> anyhow::Result<()> {
     )
 }
 
-fn set_pin_direction(pin_int: u32, direction: bool) -> anyhow::Result<()> {
+fn set_pin_direction(pin_int: u32, direction: bool) -> Res<()> {
     write_to_file(
         format!("{GPIO_PREFIX}/gpio{pin_int}/direction"),
         if direction { "in" } else { "out" },
     )
 }
 
-fn set_pin_value(pin_int: u32, value: bool) -> anyhow::Result<()> {
+fn set_pin_value(pin_int: u32, value: bool) -> Res<()> {
     write_to_file(
         format!("{GPIO_PREFIX}/gpio{pin_int}/value"),
         if value { "1" } else { "0" },
@@ -59,8 +59,8 @@ pub struct GPIO {
 }
 
 impl GPIO {
-    pub fn new(pin_str: &str, invert: bool) -> anyhow::Result<Self> {
-        let pin_int = pin_name_to_int(pin_str).ok_or(anyhow!("Invalid GPIO Pin: '{pin_str}'"))?;
+    pub fn new(pin_str: &str, invert: bool) -> Res<Self> {
+        let pin_int = pin_name_to_int(pin_str).ok_or(err!("Invalid GPIO Pin: '{pin_str}'"))?;
         let pin_str = pin_str.to_string();
 
         // The result is ignored since this might
@@ -85,7 +85,7 @@ impl GPIO {
         })
     }
 
-    pub fn set(&self, value: bool) -> anyhow::Result<()> {
+    pub fn set(&self, value: bool) -> Res<()> {
         debug!("Set GPIO pin '{}' to '{value}'", self.pin_str);
         set_pin_value(self.pin_int, value ^ self.invert)
     }

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
+use crate::error::Res;
 use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
     protocol::{
@@ -38,14 +39,16 @@ impl IdentifyResults {
         }
     }
 
-    pub fn from_zlib_bytes(zlib_bytes: &[u8]) -> anyhow::Result<Self> {
+    pub fn from_zlib_bytes(zlib_bytes: &[u8]) -> Res<Self> {
         let mut z = flate2::read::ZlibDecoder::new(zlib_bytes);
         let mut s = String::new();
-        std::io::Read::read_to_string(&mut z, &mut s)?;
+        std::io::Read::read_to_string(&mut z, &mut s)
+            .map_err(|e| err!("Failed to read zlib data: {e}"))?;
 
         debug!("Got klipper string: {s}");
 
-        let results: Self = serde_json::from_str(&s)?;
+        let results: Self = serde_json::from_str(&s)
+            .map_err(|e| err!("Failed to parse identify JSON: {e}"))?;
         Ok(results)
     }
 }
@@ -56,7 +59,7 @@ impl KlipperMCURuntime {
     /// Reads the identify table from the MCU, decompresses it, and parses the
     /// JSON to produce `IdentifyResults` (including populated command/response
     /// dictionaries).
-    pub fn identify(&mut self) -> anyhow::Result<IdentifyResults> {
+    pub fn identify(&mut self) -> Res<IdentifyResults> {
         let mut i = 0;
         let mut zlib_bytes = Vec::new();
 

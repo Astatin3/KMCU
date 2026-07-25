@@ -1,4 +1,5 @@
 use crate::{
+    error::Res,
     runtime::klipper_mcu::protocol::{
         command::{RecvCommand, SendCommand},
         dictionary::{DictionaryRecv, DictionarySend},
@@ -55,14 +56,14 @@ impl<'a> CrcWriter<'a> {
 }
 
 impl Write for CrcWriter<'_> {
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> Res<usize> {
         for &byte in buf {
             self.crc = crc16_update(self.crc, byte);
         }
         self.inner.write(buf)
     }
 
-    fn flush(&mut self) -> anyhow::Result<()> {
+    fn flush(&mut self) -> Res<()> {
         self.inner.flush()
     }
 }
@@ -120,7 +121,7 @@ impl Binary for Frame {
     type EncodeArg = DictionarySend;
     type DecodeArg = DictionaryRecv;
 
-    fn encode(&self, writer: &mut dyn Write, dict: &DictionarySend) -> anyhow::Result<()> {
+    fn encode(&self, writer: &mut dyn Write, dict: &DictionarySend) -> Res<()> {
         if let FramePayload::SendCommand(cmd) = &self.payload {
             let mut writer = CrcWriter::new(writer);
 
@@ -151,7 +152,7 @@ impl Binary for Frame {
         Ok(())
     }
 
-    fn decode(reader: &mut dyn Read, dict: &DictionaryRecv) -> anyhow::Result<Self> {
+    fn decode(reader: &mut dyn Read, dict: &DictionaryRecv) -> Res<Self> {
         let mut buf = [0u8; MESSAGE_MAX];
         let mut scan_len = 0usize;
 
@@ -186,7 +187,7 @@ impl Binary for Frame {
             // Try to fill the buffer
             let space = &mut buf[scan_len..];
             match reader.read(space) {
-                Ok(0) => anyhow::bail!("Connection closed"),
+                Ok(0) => return Err(err!("Connection closed")),
                 Ok(n) => {
                     scan_len += n;
                 }

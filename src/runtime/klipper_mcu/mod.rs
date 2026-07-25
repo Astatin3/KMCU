@@ -1,8 +1,7 @@
 use std::thread::sleep;
 
-use anyhow::anyhow;
-
 use crate::connections::gpio::GPIO;
+use crate::error::Res;
 use crate::runtime::klipper_mcu::identify::IdentifyResults;
 use crate::traits::Stream;
 use crate::{
@@ -36,7 +35,7 @@ pub struct KlipperMCURuntime {
 impl FromConfig for KlipperMCURuntime {
     type ConfigType = config::KlipperMCU;
 
-    fn from_config(config: Self::ConfigType) -> anyhow::Result<Self>
+    fn from_config(config: Self::ConfigType) -> Res<Self>
     where
         Self: Sized,
     {
@@ -70,11 +69,11 @@ impl FromConfig for KlipperMCURuntime {
         let stream: Box<dyn Stream> = match config.connection {
             config::Connection::Serial(conn) | config::Connection::Socket(conn) => Box::new(
                 Socket::from_config(conn)
-                    .map_err(|e| anyhow!("Failed to create socket connection: {e}"))?,
+                    .map_err(|e| err!("Failed to create socket connection: {e}"))?,
             ),
             config::Connection::Rpmsg(conn) => Box::new(
                 rpmsg::RpmsgEndpoint::from_config(conn)
-                    .map_err(|e| anyhow!("Failed to create RPMSG connection: {e}"))?,
+                    .map_err(|e| err!("Failed to create RPMSG connection: {e}"))?,
             ),
         };
 
@@ -88,7 +87,7 @@ impl FromConfig for KlipperMCURuntime {
         // Run the identify sequence
         this.identity = this
             .identify()
-            .map_err(|e| anyhow!("Failed identification: {e}"))?;
+            .map_err(|e| err!("Failed identification: {e}"))?;
 
         Ok(this)
     }

@@ -1,4 +1,5 @@
 use crate::{
+    error::Res,
     runtime::klipper_mcu::protocol::dictionary::{DictionaryRecv, DictionarySend},
     traits::{Binary, Read, Write},
 };
@@ -25,12 +26,12 @@ macro_rules! command {
             type EncodeArg = DictionarySend;
             type DecodeArg = DictionaryRecv;
 
-            fn encode(&self, writer: &mut dyn Write, dict: &DictionarySend) -> anyhow::Result<()> {
+            fn encode(&self, writer: &mut dyn Write, dict: &DictionarySend) -> Res<()> {
                 match self {
                     $(
                         $ename::$vname $( { $($fname),* } )? => {
                             let dynamic_id = dict.get_dynamic_id($id)
-                                .ok_or_else(|| anyhow::anyhow!("unregistered command '{}'", stringify!($ename)))?;
+                                .ok_or_else(|| err!("unregistered command '{}'", stringify!($ename)))?;
 
                             <i16 as Binary>::encode(&dynamic_id, writer, &())?;
 
@@ -45,13 +46,13 @@ macro_rules! command {
                 }
             }
 
-            fn decode(reader: &mut dyn Read, dict: &DictionaryRecv) -> anyhow::Result<Self> {
+            fn decode(reader: &mut dyn Read, dict: &DictionaryRecv) -> Res<Self> {
                 // Read the id
                 let id = <i16 as Binary>::decode(reader, &())?;
 
                 // Convert this back to an actual static id
                 let static_id = dict.get_static_id(id)
-                    .ok_or_else(|| anyhow::anyhow!("unregistered command id '{}'", id))?;
+                    .ok_or_else(|| err!("unregistered command id '{}'", id))?;
 
                 $(
                     if static_id == ($id) {
@@ -66,7 +67,7 @@ macro_rules! command {
                     }
                 )*
 
-                Err(anyhow::anyhow!(
+                Err(err!(
                     "unknown variant id {} for enum {}",
                     id,
                     stringify!($ename)

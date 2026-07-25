@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     config::{Kinematics, MCUConfig, PrinterConfig},
+    error::Res,
     runtime::{core_xy::CoreXYRuntime, klipper_mcu::KlipperMCURuntime, sim_mcu::SimMCURuntime},
     traits::{FromConfig, MCU},
 };
@@ -11,7 +12,7 @@ pub struct PrinterRuntime {
 }
 
 impl PrinterRuntime {
-    pub fn alive(&self) -> anyhow::Result<()> {
+    pub fn alive(&self) -> Res<()> {
         self.kinematics.alive()
     }
 }
@@ -19,7 +20,7 @@ impl PrinterRuntime {
 impl FromConfig for PrinterRuntime {
     type ConfigType = PrinterConfig;
 
-    fn from_config(config: Self::ConfigType) -> anyhow::Result<Self>
+    fn from_config(config: Self::ConfigType) -> Res<Self>
     where
         Self: Sized,
     {
@@ -35,7 +36,7 @@ impl FromConfig for PrinterRuntime {
                 }
                 MCUConfig::Klipper(klipper_mcuconfig) => Rc::new(RefCell::new(
                     KlipperMCURuntime::from_config(klipper_mcuconfig).map_err(|e| {
-                        anyhow::anyhow!("Failed to start Klipper MCU '{name}': {e}")
+                        err!("Failed to start Klipper MCU '{name}': {e}")
                     })?,
                 )) as Rc<RefCell<dyn MCU>>,
             };

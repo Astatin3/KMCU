@@ -4,6 +4,9 @@
 #[macro_use]
 extern crate log;
 
+#[macro_use]
+mod error;
+
 #[allow(unused)]
 mod config;
 
@@ -27,8 +30,7 @@ mod traits {
     pub use stream::{Read, Stream, Write};
 }
 
-mod error;
-
 pub use crate::{
+    error::Res,
     config::PrinterConfig, runtime::printer_runtime::PrinterRuntime, traits::FromConfig,
 };

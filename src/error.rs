@@ -1,9 +1,27 @@
-pub type Error = String;
-
 pub type Res<T> = core::result::Result<T, Error>;
 
-macro_rules! Err {
+#[cfg(feature = "log")]
+pub type Error = String;
+
+#[cfg(feature = "log")]
+macro_rules! err {
+    ($msg:expr) => {
+        String::from($msg)
+    };
     ($fmt:expr, $($arg:tt)*) => {
-        $crate::Error::msg($crate::__private::format!($fmt, $($arg)*))
+        format!($fmt, $($arg)*)
+    };
+}
+
+#[cfg(not(feature = "log"))]
+pub type Error = ();
+
+#[cfg(not(feature = "log"))]
+macro_rules! err {
+    ($msg:expr) => {
+        ()
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        ()
     };
 }

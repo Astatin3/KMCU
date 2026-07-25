@@ -6,7 +6,6 @@ version = 4
 name = "KMCU"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "flate2",
  "libc",
  "log",
@@ -31,12 +30,6 @@ checksum = "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301"
 dependencies = [
  "memchr",
 ]
-
-[[package]]
-name = "anyhow"
-version = "1.0.104"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "bitflags"

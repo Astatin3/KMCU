@@ -5,6 +5,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::time::{Duration, Instant};
 
 use crate::config::RpmsgConnection;
+use crate::error::Res;
 use crate::traits::{FromConfig, Read, Stream, Write};
 
 const RPMSG_NAME_SIZE: usize = 32;
@@ -45,7 +46,7 @@ pub struct RpmsgEndpoint {
 }
 
 impl RpmsgEndpoint {
-    pub fn new(config: RpmsgConnection) -> anyhow::Result<Self> {
+    pub fn new(config: RpmsgConnection) -> Res<Self> {
         let mut this = Self {
             data_fd: None,
             config,
@@ -60,7 +61,7 @@ impl RpmsgEndpoint {
         &self.ept_path
     }
 
-    pub fn reconnect(&mut self) -> anyhow::Result<()> {
+    pub fn reconnect(&mut self) -> Res<()> {
         self.teardown();
         self.connect()
     }
@@ -71,19 +72,19 @@ impl RpmsgEndpoint {
         // subsequent DESTROY_EPT ioctl fail with ENXIO.
         if self.ept_id >= 0 {
             if let Err(e) = destroy_endpoint(&self.config.ctrl_path, self.ept_id) {
-                warn!("Failed to destroy RPMSG endpoint {}: {e}", self.ept_id);
+                warn!("Failed to destroy RPMSG endpoint {}: {e:?}", self.ept_id);
             }
             self.ept_id = -1;
         }
         self.data_fd = None;
     }
 
-    fn connect(&mut self) -> anyhow::Result<()> {
+    fn connect(&mut self) -> Res<()> {
         if !self.config.remoteproc_state_path.is_empty() {
             if let Err(e) =
                 restart_remoteproc(&self.config.remoteproc_state_path, self.config.settle)
             {
-                warn!("Failed to restart DSP via remoteproc: {e}");
+                warn!("Failed to restart DSP via remoteproc: {e:?}");
             }
         }
 
@@ -101,7 +102,7 @@ impl RpmsgEndpoint {
             match create_endpoint(&self.config.ctrl_path, &self.config.channel_name) {
                 Ok(id) => break id,
                 Err(e) if Instant::now() < create_deadline => {
-                    debug!("RPMSG_CREATE_EPT not ready yet, retrying: {e}");
+                    debug!("RPMSG_CREATE_EPT not ready yet, retrying: {e:?}");
                     std::thread::sleep(Duration::from_millis(250));
                 }
                 Err(e) => return Err(e),
@@ -148,11 +149,11 @@ fn io_err_is_recoverable(e: &std::io::Error) -> bool {
 }
 
 impl Read for RpmsgEndpoint {
-    fn read(&mut self, buf: &mut [u8]) -> anyhow::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Res<usize> {
         let fd = self
             .data_fd
             .as_mut()
-            .ok_or_else(|| anyhow::anyhow!("RPMSG not connected"))?;
+            .ok_or_else(|| err!("RPMSG not connected"))?;
 
         match poll_then_read(fd, self.config.timeout, buf) {
             Ok(n) => Ok(n),
@@ -160,9 +161,9 @@ impl Read for RpmsgEndpoint {
                 warn!("RPMSG read failed ({e}), reconnecting");
                 self.reconnect()?;
                 let fd = self.data_fd.as_mut().unwrap();
-                Ok(poll_then_read(fd, self.config.timeout, buf)?)
+                Ok(poll_then_read(fd, self.config.timeout, buf).map_err(|e| err!("{e}"))?)
             }
-            Err(e) => Err(e.into()),
+            Err(e) => Err(err!("{e}")),
         }
     }
 }
@@ -197,9 +198,9 @@ fn write_with_timeout(
 }
 
 impl Write for RpmsgEndpoint {
-    fn write(&mut self, buf: &[u8]) -> anyhow::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> Res<usize> {
         if self.data_fd.is_none() {
-            return Err(anyhow::anyhow!("RPMSG not connected"));
+            return Err(err!("RPMSG not connected"));
         }
         let deadline = Instant::now() + self.config.timeout;
         let result = write_with_timeout(self.data_fd.as_mut().unwrap(), buf, deadline);
@@ -213,15 +214,15 @@ impl Write for RpmsgEndpoint {
                     self.data_fd.as_mut().unwrap(),
                     buf,
                     deadline,
-                )?)
+                ).map_err(|e| err!("{e}"))?)
             }
-            Err(e) => Err(e.into()),
+            Err(e) => Err(err!("{e}")),
         }
     }
 
-    fn flush(&mut self) -> anyhow::Result<()> {
+    fn flush(&mut self) -> Res<()> {
         if let Some(fd) = self.data_fd.as_mut() {
-            fd.flush()?;
+            fd.flush().map_err(|e| err!("{e}"))?;
         }
         Ok(())
     }
@@ -237,7 +238,7 @@ fn poll_then_read(fd: &std::fs::File, timeout: Duration, buf: &mut [u8]) -> std:
 impl FromConfig for RpmsgEndpoint {
     type ConfigType = RpmsgConnection;
 
-    fn from_config(config: Self::ConfigType) -> anyhow::Result<Self>
+    fn from_config(config: Self::ConfigType) -> Res<Self>
     where
         Self: Sized,
     {
@@ -247,18 +248,18 @@ impl FromConfig for RpmsgEndpoint {
 
 // --- Low-level helpers ---
 
-fn wait_for_path(path: &str, timeout: Duration) -> anyhow::Result<()> {
+fn wait_for_path(path: &str, timeout: Duration) -> Res<()> {
     let deadline = Instant::now() + timeout;
     while !fs::metadata(path).is_ok() {
         if Instant::now() >= deadline {
-            anyhow::bail!("Timed out waiting for {path}");
+            return Err(err!("Timed out waiting for {path}"));
         }
         std::thread::sleep(Duration::from_millis(50));
     }
     Ok(())
 }
 
-fn list_rpmsg_devices() -> anyhow::Result<Vec<String>> {
+fn list_rpmsg_devices() -> Res<Vec<String>> {
     let mut devices = Vec::new();
     if let Ok(entries) = fs::read_dir("/dev") {
         for entry in entries.flatten() {
@@ -277,17 +278,17 @@ fn list_rpmsg_devices() -> anyhow::Result<Vec<String>> {
 ///
 /// Returns the kernel-assigned endpoint ID (written back by the driver into
 /// `info.src` at offset 32, which overlaps with Elegoo's `rpmsg_ept_info.id`).
-fn create_endpoint(ctrl_path: &str, channel_name: &str) -> anyhow::Result<i32> {
+fn create_endpoint(ctrl_path: &str, channel_name: &str) -> Res<i32> {
     let ctrl_fd = unsafe {
-        let path = CString::new(ctrl_path)?;
+        let path = CString::new(ctrl_path).map_err(|e| err!("{e}"))?;
         libc::open(path.as_ptr(), libc::O_RDWR)
     };
     if ctrl_fd < 0 {
-        anyhow::bail!(
+        return Err(err!(
             "Failed to open RPMSG ctrl device {}: {}",
             ctrl_path,
             std::io::Error::last_os_error()
-        );
+        ));
     }
 
     let mut info = RpmsgEndpointInfo {
@@ -317,7 +318,7 @@ fn create_endpoint(ctrl_path: &str, channel_name: &str) -> anyhow::Result<i32> {
     let err = if ret < 0 {
         let e = std::io::Error::last_os_error();
         unsafe { libc::close(ctrl_fd) };
-        anyhow::bail!("ioctl RPMSG_CREATE_EPT failed: {e}");
+        return Err(err!("ioctl RPMSG_CREATE_EPT failed: {e}"));
     } else {
         unsafe { libc::close(ctrl_fd) };
         // The Elegoo-patched kernel writes the assigned endpoint address
@@ -330,16 +331,16 @@ fn create_endpoint(ctrl_path: &str, channel_name: &str) -> anyhow::Result<i32> {
     err
 }
 
-fn destroy_endpoint(ctrl_path: &str, ept_id: i32) -> anyhow::Result<()> {
+fn destroy_endpoint(ctrl_path: &str, ept_id: i32) -> Res<()> {
     let ctrl_fd = unsafe {
-        let path = CString::new(ctrl_path)?;
+        let path = CString::new(ctrl_path).map_err(|e| err!("{e}"))?;
         libc::open(path.as_ptr(), libc::O_RDWR)
     };
     if ctrl_fd < 0 {
-        anyhow::bail!(
+        return Err(err!(
             "Failed to open RPMSG ctrl device for destroy: {}",
             std::io::Error::last_os_error()
-        );
+        ));
     }
 
     // Match Elegoo's rpmsg_free_ept(): pass rpmsg_ept_info with the endpoint id.
@@ -359,7 +360,7 @@ fn destroy_endpoint(ctrl_path: &str, ept_id: i32) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn wait_for_new_rpmsg(before: &[String], timeout: Duration) -> anyhow::Result<String> {
+fn wait_for_new_rpmsg(before: &[String], timeout: Duration) -> Res<String> {
     let deadline = Instant::now() + timeout;
     loop {
         let current = list_rpmsg_devices()?;
@@ -369,7 +370,7 @@ fn wait_for_new_rpmsg(before: &[String], timeout: Duration) -> anyhow::Result<St
             }
         }
         if Instant::now() >= deadline {
-            anyhow::bail!("Timed out waiting for new /dev/rpmsgN device");
+            return Err(err!("Timed out waiting for new /dev/rpmsgN device"));
         }
         std::thread::sleep(Duration::from_millis(100));
     }
@@ -382,16 +383,16 @@ fn wait_for_new_rpmsg(before: &[String], timeout: Duration) -> anyhow::Result<St
 /// indefinitely when the kernel's virtio TX buffer is full or the DSP
 /// isn't consuming messages.  Our `Write::write()` impl handles EAGAIN
 /// with a retry loop bounded by a deadline (see `write_with_timeout`).
-fn open_data_endpoint(path: &str) -> anyhow::Result<std::fs::File> {
+fn open_data_endpoint(path: &str) -> Res<std::fs::File> {
     let fd = unsafe {
-        let c_path = CString::new(path)?;
+        let c_path = CString::new(path).map_err(|e| err!("{e}"))?;
         libc::open(c_path.as_ptr(), libc::O_RDWR)
     };
     if fd < 0 {
-        anyhow::bail!(
+        return Err(err!(
             "Failed to open RPMSG data endpoint {path}: {}",
             std::io::Error::last_os_error()
-        );
+        ));
     }
     // Set non-blocking — writes return EAGAIN instead of blocking.
     unsafe {
@@ -427,7 +428,7 @@ fn poll_ready(fd: RawFd, events: i16, timeout: Duration) -> std::io::Result<()> 
     Ok(())
 }
 
-fn restart_remoteproc(state_path: &str, settle: Duration) -> anyhow::Result<()> {
+fn restart_remoteproc(state_path: &str, settle: Duration) -> Res<()> {
     debug!("Restarting DSP via remoteproc: {state_path}");
 
     if let Err(e) = fs::write(state_path, "stop") {
@@ -436,7 +437,7 @@ fn restart_remoteproc(state_path: &str, settle: Duration) -> anyhow::Result<()> 
     std::thread::sleep(settle);
 
     fs::write(state_path, "start")
-        .map_err(|e| anyhow::anyhow!("Failed to write 'start' to {state_path}: {e}"))?;
+        .map_err(|e| err!("Failed to write 'start' to {state_path}: {e}"))?;
     std::thread::sleep(settle);
 
     debug!("DSP restarted, waiting for settle");
