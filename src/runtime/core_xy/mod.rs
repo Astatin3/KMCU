@@ -1,4 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use core::cell::RefCell;
+use std::collections::HashMap;
+
+use alloc::{boxed::Box, rc::Rc, string::String};
 
 use crate::{
     config::{AxisConfig, CoreXYKinematics},

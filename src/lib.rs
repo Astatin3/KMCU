@@ -1,20 +1,19 @@
 // #![no_std]
 #![allow(unused)]
 
+extern crate alloc;
+
 #[macro_use]
 extern crate log;
 
 #[macro_use]
 mod error;
 
-#[allow(unused)]
 mod config;
-
-mod runtime;
-
-mod gcode;
-
 mod connections;
+mod gcode;
+mod runtime;
+mod vlq;
 
 mod traits {
     mod axis;
@@ -31,6 +30,5 @@ mod traits {
 }
 
 pub use crate::{
-    error::Res,
-    config::PrinterConfig, runtime::printer_runtime::PrinterRuntime, traits::FromConfig,
+    config::PrinterConfig, error::Res, runtime::printer_runtime::PrinterRuntime, traits::FromConfig,
 };

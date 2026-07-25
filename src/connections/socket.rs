@@ -7,21 +7,25 @@ use crate::error::Res;
 use crate::traits::{FromConfig, Read, Stream, Write};
 
 pub struct Socket {
-    inner: File,
+    fd: File,
     config: SocketConnection,
 }
 
 impl Socket {
     pub fn new(config: SocketConnection) -> Res<Self> {
-        let inner = File::options().read(true).write(true).open(&config.path).map_err(|e| err!("{e}"))?;
+        let fd = File::options()
+            .read(true)
+            .write(true)
+            .open(&config.path)
+            .map_err(|e| err!("{e}"))?;
         debug!("Opened socket device '{}'", config.path);
-        Ok(Self { inner, config })
+        Ok(Self { fd, config })
     }
 
     pub fn new_serial(config: SocketConnection) -> Res<Self> {
         let baud = config.baud.unwrap_or(115_200);
 
-        let inner = unsafe {
+        let fd = unsafe {
             let raw_fd = libc::open(
                 config.path.as_ptr() as *const libc::c_char,
                 libc::O_RDWR | libc::O_NOCTTY,
@@ -63,7 +67,7 @@ impl Socket {
             "Opened serial port '{}' at {baud} baud, timeout={:?}",
             config.path, config.timeout
         );
-        Ok(Self { inner, config })
+        Ok(Self { fd, config })
     }
 
     fn poll_ready(&self, fd: RawFd, events: i16) -> Res<()> {
@@ -92,23 +96,23 @@ impl Socket {
 
 impl Read for Socket {
     fn read(&mut self, buf: &mut [u8]) -> Res<usize> {
-        self.poll_ready(self.inner.as_raw_fd(), libc::POLLIN)?;
-        Ok(std::io::Read::read(&mut self.inner, buf).map_err(|e| err!("{e}"))?)
+        self.poll_ready(self.fd.as_raw_fd(), libc::POLLIN)?;
+        Ok(std::io::Read::read(&mut self.fd, buf).map_err(|e| err!("{e}"))?)
     }
 }
 
 impl Write for Socket {
     fn write(&mut self, buf: &[u8]) -> Res<usize> {
-        self.poll_ready(self.inner.as_raw_fd(), libc::POLLOUT)?;
-        Ok(self.inner.write(buf).map_err(|e| err!("{e}"))?)
+        self.poll_ready(self.fd.as_raw_fd(), libc::POLLOUT)?;
+        Ok(self.fd.write(buf).map_err(|e| err!("{e}"))?)
     }
 
     fn flush(&mut self) -> Res<()> {
-        Ok(self.inner.flush().map_err(|e| err!("{e}"))?)
+        Ok(self.fd.flush().map_err(|e| err!("{e}"))?)
     }
 }
 
-impl crate::traits::Stream for Socket {}
+impl Stream for Socket {}
 
 impl FromConfig for Socket {
     type ConfigType = SocketConnection;

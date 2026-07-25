@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use crate::{
     error::Res,
     runtime::klipper_mcu::protocol::dictionary::{DictionaryRecv, DictionarySend},

@@ -13,9 +13,11 @@
 //!    e.g. `from_str::<Command>("G1 X10 Y20")` where
 //!    `enum Command { G1(Move), G28(Home), .. }`.
 
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::fmt;
 use serde::Deserialize;
 use serde::de::{self, DeserializeSeed, EnumAccess, MapAccess, VariantAccess, Visitor};
-use std::fmt;
 
 // ============================================================================
 // Error
@@ -65,7 +67,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl core::error::Error for Error {}
 
 impl de::Error for Error {
     fn custom<T: fmt::Display>(msg: T) -> Self {
@@ -352,7 +354,7 @@ impl<'de> de::Deserializer<'de> for FieldsDeserializer<'de> {
 }
 
 struct FieldsAccess<'de> {
-    iter: std::vec::IntoIter<(char, &'de str)>,
+    iter: alloc::vec::IntoIter<(char, &'de str)>,
     value: Option<&'de str>,
 }
 

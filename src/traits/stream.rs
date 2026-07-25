@@ -1,5 +1,7 @@
 use core::fmt;
 
+use alloc::{string::String, vec::Vec};
+
 use crate::error::Res;
 
 pub trait Stream: Read + Write {}
@@ -34,9 +36,8 @@ pub trait Read {
     fn read_to_string(&mut self, buf: &mut String) -> Res<usize> {
         let mut bytes = Vec::new();
         let len = self.read_to_end(&mut bytes)?;
-        let s = core::str::from_utf8(&bytes).map_err(|_| {
-            err!("stream did not contain valid UTF-8")
-        })?;
+        let s =
+            core::str::from_utf8(&bytes).map_err(|_| err!("stream did not contain valid UTF-8"))?;
         buf.push_str(s);
         Ok(len)
     }

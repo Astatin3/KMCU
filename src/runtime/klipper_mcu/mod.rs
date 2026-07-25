@@ -15,13 +15,16 @@ mod io;
 mod mcu;
 
 pub mod protocol {
-    pub mod command;
-    pub mod dictionary;
-    pub mod message;
-    pub mod vlq;
+    mod command;
+    mod dictionary;
+    mod message;
+
+    pub use command::{RecvCommand, SendCommand};
+    pub use dictionary::{DictionaryRecv, DictionarySend};
+    pub use message::{Frame, FramePayload};
 }
 
-use protocol::dictionary::DictionarySend;
+use protocol::DictionarySend;
 
 pub struct KlipperMCURuntime {
     pub stream: Box<dyn Stream>,

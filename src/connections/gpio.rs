@@ -2,6 +2,8 @@
 
 use std::{thread::sleep, time::Duration};
 
+use alloc::{format, string::String};
+
 use crate::error::Res;
 
 const GPIO_PREFIX: &str = "/sys/class/gpio";

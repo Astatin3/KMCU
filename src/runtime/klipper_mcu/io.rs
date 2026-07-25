@@ -3,13 +3,7 @@ use std::io::Cursor;
 use crate::error::Res;
 use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
-    protocol::{
-        command::{RecvCommand, SendCommand},
-        message::{
-            CrcWriter, Frame, FramePayload, MESSAGE_MAX, MESSAGE_MIN, MESSAGE_SYNC,
-            compose_sequence_number,
-        },
-    },
+    protocol::{Frame, FramePayload, RecvCommand, SendCommand},
 };
 use crate::traits::{Binary, Write};
 

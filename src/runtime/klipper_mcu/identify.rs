@@ -1,14 +1,12 @@
 use std::collections::HashMap;
 
+use alloc::string::String;
 use serde::Deserialize;
 
 use crate::error::Res;
 use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
-    protocol::{
-        command::{RecvCommand, SendCommand},
-        dictionary::{DictionaryRecv, DictionarySend},
-    },
+    protocol::{DictionaryRecv, DictionarySend, RecvCommand, SendCommand},
 };
 
 #[derive(Deserialize)]
@@ -47,8 +45,8 @@ impl IdentifyResults {
 
         debug!("Got klipper string: {s}");
 
-        let results: Self = serde_json::from_str(&s)
-            .map_err(|e| err!("Failed to parse identify JSON: {e}"))?;
+        let results: Self =
+            serde_json::from_str(&s).map_err(|e| err!("Failed to parse identify JSON: {e}"))?;
         Ok(results)
     }
 }

@@ -1,15 +1,15 @@
 pub type Res<T> = core::result::Result<T, Error>;
 
 #[cfg(feature = "log")]
-pub type Error = String;
+pub type Error = alloc::string::String;
 
 #[cfg(feature = "log")]
 macro_rules! err {
     ($msg:expr) => {
-        String::from($msg)
+        alloc::string::String::from($msg)
     };
     ($fmt:expr, $($arg:tt)*) => {
-        format!($fmt, $($arg)*)
+        alloc::format!($fmt, $($arg)*)
     };
 }
 

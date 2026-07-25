@@ -5,6 +5,7 @@ mod kinematics;
 mod mcu;
 mod pin;
 
+use alloc::string::String;
 pub use axis::*;
 pub use connection::*;
 pub use kinematics::*;

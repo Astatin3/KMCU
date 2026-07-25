@@ -2,6 +2,7 @@ use crate::config::de_duration;
 
 use std::time::Duration;
 
+use alloc::string::String;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]

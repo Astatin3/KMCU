@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use alloc::string::String;
 use serde::Deserialize;
 
 use crate::config::{connection::Connection, de_duration};

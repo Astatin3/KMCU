@@ -69,11 +69,11 @@ impl Write for CrcWriter<'_> {
 }
 
 pub struct Frame {
-    pub(crate) seq: u8,
-    pub(crate) payload: FramePayload,
+    seq: u8,
+    pub payload: FramePayload,
 }
 
-pub(crate) enum FramePayload {
+pub enum FramePayload {
     Empty,
     SendCommand(SendCommand),
     RecvCommand(RecvCommand),

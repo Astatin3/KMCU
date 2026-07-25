@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use alloc::string::String;
 use serde::{Deserialize, Deserializer, de::Error};
 
 use crate::runtime::klipper_mcu::protocol::command::{RecvCommand, SendCommand};

@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use alloc::boxed::Box;
+
 use crate::{config::DummyAxisConfig, traits::Axis};
 
 pub struct DummyAxis {
