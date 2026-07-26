@@ -17,9 +17,7 @@ extern crate log;
 #[macro_use]
 extern crate uom;
 
-// Add the err! macro everywhere mimicking anyhow::anyhow!
-#[macro_use]
-mod utils;
+pub mod utils;
 
 mod config;
 mod gcode;
@@ -39,6 +37,5 @@ mod traits {
     pub use stream::{Read, Stream, Write};
 }
 
-pub use crate::{
-    config::PrinterConfig, runtime::printer_runtime::PrinterRuntime, utils::error::Res,
-};
+pub use crate::utils::error::MajorStateError;
+pub use crate::{config::PrinterConfig, runtime::printer_runtime::PrinterRuntime};

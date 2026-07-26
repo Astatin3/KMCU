@@ -11,7 +11,7 @@ pub use kinematics::*;
 pub use mcu::*;
 // pub use pin::*;
 
-use crate::Res;
+use crate::utils::error::{ConfigError, MajorStateError};
 
 use serde::{Deserialize, Deserializer};
 
@@ -27,7 +27,7 @@ pub struct PrinterConfig {
 }
 
 impl PrinterConfig {
-    pub fn parse(config_string: &str) -> Res<Self> {
-        toml::from_str(config_string).map_err(|e| err!("{e}"))
+    pub fn parse(config_string: &str) -> Result<Self, MajorStateError> {
+        toml::from_str(config_string).map_err(|e| ConfigError::Toml(e).into())
     }
 }

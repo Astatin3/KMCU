@@ -2,18 +2,18 @@ use core::fmt;
 
 use alloc::{string::String, vec::Vec};
 
-use crate::Res;
+use crate::utils::error::IOError;
 
 pub trait Stream: Read + Write {}
 
 pub trait Read {
-    fn read(&mut self, buf: &mut [u8]) -> Res<usize>;
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError>;
 
     fn is_read_vectored(&self) -> bool {
         false
     }
 
-    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Res<usize> {
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize, IOError> {
         let start_len = buf.len();
         loop {
             if buf.len() == buf.capacity() {
@@ -33,22 +33,19 @@ pub trait Read {
         }
     }
 
-    fn read_to_string(&mut self, buf: &mut String) -> Res<usize> {
+    fn read_to_string(&mut self, buf: &mut String) -> Result<usize, IOError> {
         let mut bytes = Vec::new();
         let len = self.read_to_end(&mut bytes)?;
-        let s =
-            core::str::from_utf8(&bytes).map_err(|_| err!("stream did not contain valid UTF-8"))?;
+        let s = core::str::from_utf8(&bytes).map_err(|_| IOError::InvalidUTF8)?;
         buf.push_str(s);
         Ok(len)
     }
 
-    fn read_exact(&mut self, buf: &mut [u8]) -> Res<()> {
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), IOError> {
         let mut pos = 0;
         while pos < buf.len() {
             match self.read(&mut buf[pos..]) {
-                Ok(0) => {
-                    return Err(err!("failed to fill whole buffer"));
-                }
+                Ok(0) => return Err(IOError::FailedToFillWholeBuffer),
                 Ok(n) => pos += n,
                 Err(e) => return Err(e),
             }
@@ -65,18 +62,18 @@ pub trait Read {
 }
 
 pub trait Write {
-    fn write(&mut self, buf: &[u8]) -> Res<usize>;
-    fn flush(&mut self) -> Res<()>;
+    fn write(&mut self, buf: &[u8]) -> Result<usize, IOError>;
+    fn flush(&mut self) -> Result<(), IOError>;
 
     fn is_write_vectored(&self) -> bool {
         false
     }
 
-    fn write_all(&mut self, mut buf: &[u8]) -> Res<()> {
+    fn write_all(&mut self, mut buf: &[u8]) -> Result<(), IOError> {
         while !buf.is_empty() {
             match self.write(buf) {
                 Ok(0) => {
-                    return Err(err!("failed to fill whole buffer"));
+                    return Err(IOError::FailedToFillWholeBuffer);
                 }
                 Ok(n) => buf = &buf[n..],
                 Err(e) => return Err(e),
@@ -85,10 +82,10 @@ pub trait Write {
         Ok(())
     }
 
-    fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> Res<()> {
+    fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> Result<(), IOError> {
         struct Adaptor<'a, W: ?Sized + 'a> {
             inner: &'a mut W,
-            err: Res<()>,
+            err: Result<(), IOError>,
         }
 
         impl<W: Write + ?Sized> fmt::Write for Adaptor<'_, W> {
@@ -107,7 +104,9 @@ pub trait Write {
             inner: self,
             err: Ok(()),
         };
-        fmt::write(&mut adaptor, fmt).map_err(|e| err!("{e}"))?;
+
+        fmt::write(&mut adaptor, fmt).map_err(IOError::from)?;
+
         adaptor.err
     }
 
@@ -120,7 +119,7 @@ pub trait Write {
 }
 
 impl Read for &[u8] {
-    fn read(&mut self, buf: &mut [u8]) -> Res<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
         let amt = buf.len().min(self.len());
         let (a, b) = self.split_at(amt);
         buf[..amt].copy_from_slice(a);

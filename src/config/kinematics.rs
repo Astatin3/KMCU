@@ -1,7 +1,7 @@
 use alloc::string::String;
 use serde::Deserialize;
 
-use crate::utils::units;
+use crate::utils::units::{self, Acceleration, Length, Velocity};
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -23,13 +23,13 @@ pub struct CoreXYKinematics {
 
 #[derive(Debug, Deserialize)]
 pub struct GeneralKinematics {
-    pub max_velocity: u32,
-    pub max_accel: u32,
-    pub max_z_velocity: u32,
-    pub max_z_accel: u32,
+    pub max_velocity: Velocity,
+    pub max_accel: Acceleration,
+    pub max_z_velocity: Velocity,
+    pub max_z_accel: Acceleration,
 
-    pub x_range: [u32; 2],
-    pub y_range: [u32; 2],
-    pub z_range: [u32; 2],
-    pub square_corner_velocity: f32,
+    pub x_range: [Length; 2],
+    pub y_range: [Length; 2],
+    pub z_range: [Length; 2],
+    pub square_corner_velocity: Velocity,
 }

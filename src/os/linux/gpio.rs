@@ -4,17 +4,17 @@ use std::string::ToString;
 
 use alloc::{format, string::String};
 
-use crate::{Res, utils::pin::Pin};
+use crate::{utils::{error::IOError, pin::Pin}};
 
 const GPIO_PREFIX: &str = "/sys/class/gpio";
 
 // Equivalent to 'echo <string> > <filename>'
-fn write_to_file(path: String, data: &str) -> Res<()> {
+fn write_to_file(path: String, data: &str) -> Result<(), IOError> {
     trace!("Wrote '{data}' to '{path}'");
-    std::fs::write(&path, data).map_err(|e| err!("Failed to write '{data}' to '{path}': {e}"))
+    std::fs::write(&path, data).map_err(IOError::from)
 }
 
-fn set_pin_export(pin_int: u16, export: bool) -> Res<()> {
+fn set_pin_export(pin_int: u16, export: bool) -> Result<(), IOError> {
     write_to_file(
         format!(
             "{GPIO_PREFIX}/{}",
@@ -24,14 +24,14 @@ fn set_pin_export(pin_int: u16, export: bool) -> Res<()> {
     )
 }
 
-fn set_pin_direction(pin_int: u16, direction: bool) -> Res<()> {
+fn set_pin_direction(pin_int: u16, direction: bool) -> Result<(), IOError> {
     write_to_file(
         format!("{GPIO_PREFIX}/gpio{pin_int}/direction"),
         if direction { "in" } else { "out" },
     )
 }
 
-fn set_pin_value(pin_int: u16, value: bool) -> Res<()> {
+fn set_pin_value(pin_int: u16, value: bool) -> Result<(), IOError> {
     write_to_file(
         format!("{GPIO_PREFIX}/gpio{pin_int}/value"),
         if value { "1" } else { "0" },
@@ -45,7 +45,7 @@ pub struct GPIO {
 }
 
 impl GPIO {
-    pub fn new(pin: Pin, invert: bool) -> Res<Self> {
+    pub fn new(pin: Pin, invert: bool) -> Result<Self, IOError> {
         // The result is ignored since this might
         // return an error because if already exported
         let _ = set_pin_export(pin.num, true);
@@ -61,7 +61,7 @@ impl GPIO {
         Ok(Self { pin, invert })
     }
 
-    pub fn set(&self, value: bool) -> Res<()> {
+    pub fn set(&self, value: bool) -> Result<(), IOError> {
         debug!("Set GPIO pin '{}' to '{value}'", self.pin.tag);
         set_pin_value(self.pin.num, value ^ self.invert)
     }

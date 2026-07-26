@@ -1,4 +1,4 @@
-use KMCU::{PrinterConfig, PrinterRuntime, Res};
+use KMCU::{MajorStateError, PrinterConfig, PrinterRuntime};
 use log::info;
 
 fn main() {
@@ -7,11 +7,11 @@ fn main() {
 
     // Catch errors
     if let Err(e) = run() {
-        log::error!("{e:?}");
+        log::error!("{e}");
     }
 }
 
-fn run() -> Res<()> {
+fn run() -> Result<(), MajorStateError> {
     info!("Starting printer...");
 
     let config = PrinterConfig::parse(include_str!("../kmcu.toml"))?;

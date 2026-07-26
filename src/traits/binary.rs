@@ -1,16 +1,16 @@
 use alloc::vec::{self, Vec};
 
 use crate::{
-    Res,
     traits::{Read, Write},
+    utils::error::IOError,
 };
 
 pub trait Binary: Sized {
     type EncodeArg;
     type DecodeArg;
 
-    fn encode(&self, writer: &mut dyn Write, arg: &Self::EncodeArg) -> Res<()>;
-    fn decode(reader: &mut dyn Read, arg: &Self::DecodeArg) -> Res<Self>;
+    fn encode(&self, writer: &mut dyn Write, arg: &Self::EncodeArg) -> Result<(), IOError>;
+    fn decode(reader: &mut dyn Read, arg: &Self::DecodeArg) -> Result<Self, IOError>;
     fn size(&self, arg: &Self::EncodeArg) -> usize;
 }
 
@@ -20,11 +20,11 @@ macro_rules! binary_vlq_unsigned {
             type EncodeArg = ();
             type DecodeArg = ();
 
-            fn encode(&self, writer: &mut dyn Write, _: &()) -> Res<()> {
+            fn encode(&self, writer: &mut dyn Write, _: &()) -> Result<(), IOError> {
                 $crate::utils::vlq::encode_int_to(*self as u32, writer)
             }
 
-            fn decode(reader: &mut dyn Read, _: &()) -> Res<Self> {
+            fn decode(reader: &mut dyn Read, _: &()) -> Result<Self, IOError> {
                 let v = $crate::utils::vlq::parse_int(reader)?;
                 Ok(v as $t)
             }
@@ -42,11 +42,11 @@ macro_rules! binary_vlq_signed {
             type EncodeArg = ();
             type DecodeArg = ();
 
-            fn encode(&self, writer: &mut dyn Write, _: &()) -> Res<()> {
+            fn encode(&self, writer: &mut dyn Write, _: &()) -> Result<(), IOError> {
                 $crate::utils::vlq::encode_int_to(*self as u32, writer)
             }
 
-            fn decode(reader: &mut dyn Read, _: &()) -> Res<Self> {
+            fn decode(reader: &mut dyn Read, _: &()) -> Result<Self, IOError> {
                 let v = $crate::utils::vlq::parse_int(reader)?;
                 Ok(v as $t)
             }
@@ -67,12 +67,12 @@ impl Binary for u8 {
     type EncodeArg = ();
     type DecodeArg = ();
 
-    fn encode(&self, writer: &mut dyn Write, _: &()) -> Res<()> {
+    fn encode(&self, writer: &mut dyn Write, _: &()) -> Result<(), IOError> {
         writer.write_all(&[*self])?;
         Ok(())
     }
 
-    fn decode(reader: &mut dyn Read, _: &()) -> Res<Self> {
+    fn decode(reader: &mut dyn Read, _: &()) -> Result<Self, IOError> {
         let mut buf = [0u8; 1];
         reader.read_exact(&mut buf)?;
         Ok(buf[0])
@@ -87,13 +87,13 @@ impl Binary for Vec<u8> {
     type EncodeArg = ();
     type DecodeArg = ();
 
-    fn encode(&self, writer: &mut dyn Write, _: &()) -> Res<()> {
+    fn encode(&self, writer: &mut dyn Write, _: &()) -> Result<(), IOError> {
         writer.write_all(&[self.len() as u8])?;
         writer.write_all(self)?;
         Ok(())
     }
 
-    fn decode(reader: &mut dyn Read, _: &()) -> Res<Self> {
+    fn decode(reader: &mut dyn Read, _: &()) -> Result<Self, IOError> {
         let mut len = [0u8; 1];
         reader.read_exact(&mut len)?;
 

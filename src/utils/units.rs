@@ -11,6 +11,20 @@
 // Velocity      0.1 mm/s        429.5 km/s
 // Acceleration  10 mm/s^2       42,950 m/s^2
 
+pub type Mass = u32::Mass;
+pub type ShortTime = u32::ShortTime;
+pub type LongTime = u32::LongTime;
+pub type Length = u32::Length;
+pub type Velocity = u32::Velocity;
+pub type Acceleration = u32::Acceleration;
+
+pub use length::{centimeter, htmm, meter, millimeter};
+pub use short_time::{short_microsecond, short_millisecond, short_minute, short_second};
+
+pub use long_time::{
+    long_day, long_hour, long_microsecond, long_millisecond, long_minute, long_second,
+};
+
 system! {
     quantities: Q {
         length: htmm, L;
@@ -74,17 +88,6 @@ impl core::convert::TryFrom<LongTime> for ShortTime {
 mod u32 {
     Q!(super, u32);
 }
-
-pub use length::{centimeter, htmm, meter, millimeter};
-pub use short_time::{short_microsecond, short_millisecond, short_minute, short_second};
-
-pub use long_time::{
-    long_day, long_hour, long_microsecond, long_millisecond, long_minute, long_second,
-};
-
-pub type ShortTime = u32::ShortTime;
-pub type Length = u32::Length;
-pub type LongTime = u32::LongTime;
 
 pub mod mass {
     uom::quantity! {

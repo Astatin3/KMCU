@@ -4,12 +4,14 @@ use heapless::Vec;
 use miniz_oxide::inflate::{decompress_to_vec_with_limit, decompress_to_vec_zlib};
 use serde::Deserialize;
 
-use crate::Res;
-use crate::runtime::klipper_mcu::{
-    KlipperMCURuntime,
-    protocol::{DictionaryRecv, DictionarySend, RecvCommand, SendCommand},
-};
 use crate::traits::Read;
+use crate::{
+    runtime::klipper_mcu::{
+        KlipperMCURuntime,
+        protocol::{DictionaryRecv, DictionarySend, RecvCommand, SendCommand},
+    },
+    utils::error::{IOError, MCUError},
+};
 
 #[derive(Deserialize)]
 pub struct IdentifyResults {
@@ -39,17 +41,15 @@ impl IdentifyResults {
         }
     }
 
-    pub fn from_zlib_bytes(zlib_bytes: &[u8]) -> Res<Self> {
+    pub fn from_zlib_bytes(zlib_bytes: &[u8]) -> Result<Self, IOError> {
         let decompressed =
-            decompress_to_vec_zlib(zlib_bytes).map_err(|e| err!("Failed to decompress: {e}"))?;
+            decompress_to_vec_zlib(zlib_bytes).map_err(IOError::ZllibDecode)?;
 
-        let mut s =
-            String::from_utf8(decompressed).map_err(|e| err!("Failed to decompress: {e}"))?;
+        let mut s = String::from_utf8(decompressed).map_err(|_| IOError::InvalidUTF8)?;
 
         debug!("Got klipper string: {s}");
 
-        let results: Self =
-            serde_json::from_str(&s).map_err(|e| err!("Failed to parse identify JSON: {e}"))?;
+        let results: Self = serde_json::from_str(&s).map_err(|_| IOError::InvalidJSON)?;
         Ok(results)
     }
 }
@@ -60,7 +60,7 @@ impl KlipperMCURuntime {
     /// Reads the identify table from the MCU, decompresses it, and parses the
     /// JSON to produce `IdentifyResults` (including populated command/response
     /// dictionaries).
-    pub fn identify(&mut self) -> Res<IdentifyResults> {
+    pub fn identify(&mut self) -> Result<IdentifyResults, MCUError> {
         let mut i = 0;
         let mut zlib_bytes = Vec::<_, 4096>::new(); // 4 KB should be enough memory to store the JSON
 
@@ -93,6 +93,6 @@ impl KlipperMCURuntime {
             };
         }
 
-        IdentifyResults::from_zlib_bytes(&zlib_bytes)
+        IdentifyResults::from_zlib_bytes(&zlib_bytes).map_err(MCUError::KlipperConnection)
     }
 }

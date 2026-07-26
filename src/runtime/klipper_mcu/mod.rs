@@ -1,4 +1,3 @@
-use crate::Res;
 use crate::os::GPIO;
 use crate::runtime::klipper_mcu::identify::IdentifyResults;
 use crate::traits::Stream;

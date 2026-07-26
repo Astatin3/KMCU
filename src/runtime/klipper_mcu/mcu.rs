@@ -1,13 +1,13 @@
 use serde_json::json;
 
 use crate::{
-    Res,
     runtime::klipper_mcu::{KlipperMCURuntime, protocol::SendCommand},
     traits::MCU,
+    utils::error::MCUError,
 };
 
 impl MCU for KlipperMCURuntime {
-    fn alive(&mut self) -> Res<()> {
+    fn alive(&mut self) -> Result<(), MCUError> {
         // Send a ping to the MCU
         self.send_command(SendCommand::identify {
             offset: 0,

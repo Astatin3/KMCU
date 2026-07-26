@@ -2,9 +2,9 @@ use std::fs::File;
 use std::io::{Read as _, Write as _};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
-use crate::Res;
 use crate::config::{SerialConnection, SocketConnection};
 use crate::traits::{Read, Stream, Write};
+use crate::utils::error::IOError;
 use crate::utils::units;
 
 pub struct Socket {
@@ -13,30 +13,29 @@ pub struct Socket {
 }
 
 impl Socket {
-    pub fn new(config: SocketConnection) -> Res<Self> {
+    pub fn new(config: SocketConnection) -> Result<Self, IOError> {
         let fd = File::options()
             .read(true)
             .write(true)
-            .open(&config.path)
-            .map_err(|e| err!("{e}"))?;
+            .open(&config.path)?;
         debug!("Opened socket device '{}'", config.path);
         Ok(Self { fd, config })
     }
 
-    pub fn new_serial(config: SerialConnection) -> Res<Self> {
+    pub fn new_serial(config: SerialConnection) -> Result<Self, IOError> {
         let fd = unsafe {
             let raw_fd = libc::open(
                 config.path.as_ptr() as *const libc::c_char,
                 libc::O_RDWR | libc::O_NOCTTY,
             );
             if raw_fd < 0 {
-                return Err(err!("{}", std::io::Error::last_os_error()));
+                return Err(std::io::Error::last_os_error().into());
             }
 
             let mut termios: libc::termios = std::mem::zeroed();
             if libc::tcgetattr(raw_fd, &mut termios) != 0 {
                 libc::close(raw_fd);
-                return Err(err!("{}", std::io::Error::last_os_error()));
+                return Err(std::io::Error::last_os_error().into());
             }
 
             libc::cfmakeraw(&mut termios);
@@ -53,7 +52,7 @@ impl Socket {
 
             if libc::tcsetattr(raw_fd, libc::TCSANOW, &termios) != 0 {
                 libc::close(raw_fd);
-                return Err(err!("{}", std::io::Error::last_os_error()));
+                return Err(std::io::Error::last_os_error().into());
             }
 
             // Set O_NONBLOCK for poll-based timeout
@@ -77,7 +76,7 @@ impl Socket {
         })
     }
 
-    fn poll_ready(&self, fd: RawFd, events: i16) -> Res<()> {
+    fn poll_ready(&self, fd: RawFd, events: i16) -> Result<(), IOError> {
         let mut pollfd = libc::pollfd {
             fd,
             events,
@@ -88,13 +87,13 @@ impl Socket {
         let ret = unsafe { libc::poll(&mut pollfd, 1, ms) };
 
         if ret < 0 {
-            return Err(err!("{}", std::io::Error::last_os_error()));
+            return Err(std::io::Error::last_os_error().into());
         }
         if ret == 0 {
-            return Err(err!("Timed out after {:?}", self.config.timeout));
+            return Err(IOError::Timeout);
         }
         if pollfd.revents & libc::POLLERR != 0 {
-            return Err(err!("Poll error on socket device"));
+            return Err(IOError::Linux { errno: 0 });
         }
 
         Ok(())
@@ -102,20 +101,21 @@ impl Socket {
 }
 
 impl Read for Socket {
-    fn read(&mut self, buf: &mut [u8]) -> Res<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
         self.poll_ready(self.fd.as_raw_fd(), libc::POLLIN)?;
-        Ok(std::io::Read::read(&mut self.fd, buf).map_err(|e| err!("{e}"))?)
+        Ok(std::io::Read::read(&mut self.fd, buf).map_err(IOError::from)?)
     }
 }
 
 impl Write for Socket {
-    fn write(&mut self, buf: &[u8]) -> Res<usize> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, IOError> {
         self.poll_ready(self.fd.as_raw_fd(), libc::POLLOUT)?;
-        Ok(self.fd.write(buf).map_err(|e| err!("{e}"))?)
+        Ok(std::io::Write::write(&mut self.fd, buf).map_err(IOError::from)?)
     }
 
-    fn flush(&mut self) -> Res<()> {
-        Ok(self.fd.flush().map_err(|e| err!("{e}"))?)
+    fn flush(&mut self) -> Result<(), IOError> {
+        std::io::Write::flush(&mut self.fd).map_err(IOError::from)?;
+        Ok(())
     }
 }
 

@@ -1,6 +1,6 @@
 use alloc::string::String;
 
-use crate::Res;
+use crate::utils::error::IOError;
 
 pub struct GPIO {
     pin_str: String,
@@ -8,7 +8,7 @@ pub struct GPIO {
 }
 
 impl GPIO {
-    pub fn new(pin_str: &str, invert: bool) -> Res<Self> {
+    pub fn new(pin_str: &str, invert: bool) -> Result<Self, IOError> {
         debug!("Dummy GPIO: init '{pin_str}'");
         Ok(Self {
             pin_str: pin_str.into(),
@@ -16,7 +16,7 @@ impl GPIO {
         })
     }
 
-    pub fn set(&self, value: bool) -> Res<()> {
+    pub fn set(&self, value: bool) -> Result<(), IOError> {
         debug!(
             "Dummy GPIO: set '{}' to '{}'",
             self.pin_str,

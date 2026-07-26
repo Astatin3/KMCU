@@ -3,10 +3,10 @@ use core::cell::RefCell;
 use alloc::{collections::btree_map::BTreeMap, rc::Rc};
 
 use crate::{
-    Res,
     config::{Kinematics, MCUConfig, PrinterConfig},
     runtime::{core_xy::CoreXYRuntime, dummy::SimMCURuntime, klipper_mcu::KlipperMCURuntime},
     traits::MCU,
+    utils::error::{RuntimeError, RuntimeInitError},
 };
 
 pub struct PrinterRuntime {
@@ -14,11 +14,11 @@ pub struct PrinterRuntime {
 }
 
 impl PrinterRuntime {
-    pub fn alive(&self) -> Res<()> {
+    pub fn alive(&self) -> Result<(), RuntimeError> {
         self.kinematics.alive()
     }
 
-    pub fn from_config(config: PrinterConfig) -> Res<Self>
+    pub fn from_config(config: PrinterConfig) -> Result<Self, RuntimeInitError>
     where
         Self: Sized,
     {
@@ -34,7 +34,7 @@ impl PrinterRuntime {
                 }
                 MCUConfig::Klipper(klipper_mcuconfig) => Rc::new(RefCell::new(
                     KlipperMCURuntime::from_config(klipper_mcuconfig)
-                        .map_err(|e| err!("Failed to start Klipper MCU '{name}': {e}"))?,
+                        .map_err(|e| RuntimeInitError::MCU(e, (&name).into()))?,
                 )) as Rc<RefCell<dyn MCU>>,
             };
 

@@ -3,10 +3,10 @@ use core::cell::RefCell;
 use alloc::{boxed::Box, collections::btree_map::BTreeMap, rc::Rc, string::String};
 
 use crate::{
-    Res,
     config::{AxisConfig, CoreXYKinematics},
     runtime::dummy::DummyAxis,
     traits::{Axis, MCU},
+    utils::error::{IOError, MCUError, RuntimeError},
 };
 
 pub struct CoreXYRuntime {
@@ -20,11 +20,11 @@ pub struct CoreXYRuntime {
 }
 
 impl CoreXYRuntime {
-    pub fn alive(&self) -> Res<()> {
+    pub fn alive(&self) -> Result<(), RuntimeError> {
         for (name, mcu) in &self.mcus {
             mcu.borrow_mut()
                 .alive()
-                .map_err(|e| err!("Failed to run alive check for MCU '{name}': {e}"))?;
+                .map_err(|e| RuntimeError::MCU(e, name.into()))?;
         }
 
         Ok(())
@@ -36,21 +36,25 @@ impl CoreXYRuntime {
             BTreeMap<String, AxisConfig>,
             BTreeMap<String, Rc<RefCell<dyn MCU>>>,
         ),
-    ) -> Res<Self>
+    ) -> Result<Self, RuntimeError>
     where
         Self: Sized,
     {
-        let mut create_axis = |names: &(String, String)| -> Res<Box<dyn Axis>> {
+        let mut create_axis = |names: &(String, String)| -> Result<Box<dyn Axis>, RuntimeError> {
             let (mcu_name, axis_name) = names;
 
             let mcu = mcus
                 .get(mcu_name)
-                .ok_or(err!("Could not find MCU by name of {mcu_name}"))?
+                .ok_or(RuntimeError::MCU(
+                    MCUError::KlipperConnection(IOError::NotConnected),
+                    (mcu_name).into(),
+                ))?
                 .clone();
 
-            let axis_config = axes
-                .remove(axis_name)
-                .ok_or(err!("Could not find axis by name of {axis_name}"))?;
+            let axis_config = axes.remove(axis_name).ok_or(RuntimeError::MCU(
+                MCUError::KlipperConnection(IOError::NotConnected),
+                (axis_name).into(),
+            ))?;
 
             let axis = match axis_config {
                 AxisConfig::Dummy(dummy_axis_config) => DummyAxis::new(dummy_axis_config),
