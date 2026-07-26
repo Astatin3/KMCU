@@ -2,7 +2,7 @@ use core::fmt;
 
 use alloc::{string::String, vec::Vec};
 
-use crate::error::Res;
+use crate::Res;
 
 pub trait Stream: Read + Write {}
 

@@ -1,4 +1,4 @@
-use crate::error::Res;
+use crate::Res;
 
 // pub trait FromConfig {
 //     type ConfigType;

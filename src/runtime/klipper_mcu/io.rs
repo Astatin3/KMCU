@@ -1,4 +1,4 @@
-use crate::error::Res;
+use crate::Res;
 use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
     protocol::{Frame, FramePayload, RecvCommand, SendCommand},

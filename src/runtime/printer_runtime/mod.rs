@@ -3,8 +3,8 @@ use core::cell::RefCell;
 use alloc::{collections::btree_map::BTreeMap, rc::Rc};
 
 use crate::{
+    Res,
     config::{Kinematics, MCUConfig, PrinterConfig},
-    error::Res,
     runtime::{core_xy::CoreXYRuntime, dummy::SimMCURuntime, klipper_mcu::KlipperMCURuntime},
     traits::MCU,
 };

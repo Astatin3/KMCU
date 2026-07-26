@@ -2,11 +2,10 @@ use std::fs::File;
 use std::io::{Read as _, Write as _};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
-use crate::units;
-
+use crate::Res;
 use crate::config::{SerialConnection, SocketConnection};
-use crate::error::Res;
 use crate::traits::{Read, Stream, Write};
+use crate::utils::units;
 
 pub struct Socket {
     fd: File,

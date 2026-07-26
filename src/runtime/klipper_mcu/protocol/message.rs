@@ -1,5 +1,5 @@
 use crate::{
-    error::Res,
+    Res,
     runtime::klipper_mcu::protocol::{
         command::{RecvCommand, SendCommand},
         dictionary::{DictionaryRecv, DictionarySend},

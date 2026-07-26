@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use crate::{
-    error::Res,
+    Res,
     runtime::klipper_mcu::protocol::dictionary::{DictionaryRecv, DictionarySend},
     traits::{Binary, Read, Write},
 };

@@ -1,5 +1,5 @@
+use crate::Res;
 use crate::config::RpmsgConnection;
-use crate::error::Res;
 use crate::traits::{Read, Stream, Write};
 
 pub struct RpmsgEndpoint {

@@ -11,7 +11,7 @@ pub use kinematics::*;
 pub use mcu::*;
 // pub use pin::*;
 
-use crate::error::Res;
+use crate::Res;
 
 use serde::{Deserialize, Deserializer};
 

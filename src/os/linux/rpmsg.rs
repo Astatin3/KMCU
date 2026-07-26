@@ -5,12 +5,11 @@ use std::string::{String, ToString};
 use std::vec::Vec;
 use std::{format, fs};
 
-use crate::units;
-
+use crate::Res;
 use crate::config::RpmsgConnection;
-use crate::error::Res;
 use crate::os::linux::clock;
 use crate::traits::{Read, Stream, Write};
+use crate::utils::units;
 
 const RPMSG_NAME_SIZE: usize = 32;
 const RPMSG_ADDR_ANY: u32 = 0xFFFFFFFF;

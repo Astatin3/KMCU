@@ -1,4 +1,4 @@
-use crate::{config::SimMCUConfig, error::Res, traits::MCU};
+use crate::{Res, config::SimMCUConfig, traits::MCU};
 
 pub struct SimMCURuntime {
     // axes: HashMap<String, Box<dyn Axis>>,

@@ -1,6 +1,9 @@
 // "Variable length quantity" derived from https://github.com/Klipper3d/klipper/blob/c707dd19214709dc23684b254a68e3bf69e4cfb3/src/command.c
 
-use crate::{error::Res, traits::{Read, Write}};
+use crate::{
+    Res,
+    traits::{Read, Write},
+};
 
 fn read_byte(reader: &mut dyn Read) -> Res<u8> {
     let mut buf = [0u8; 1];

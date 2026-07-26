@@ -3,12 +3,12 @@ use core::fmt;
 #[derive(Eq)]
 pub struct Pin {
     // Numerical representation of a pin
-    num: u16,
+    pub num: u16,
 
     // String representation of a pin,
     // like PA16 or PB0
     // Should never be longer than 4 chars
-    tag: heapless::String<4>,
+    pub tag: heapless::String<4>,
 }
 
 fn pin_name_to_int(pin_name: &str) -> Option<u32> {
@@ -60,14 +60,6 @@ impl Pin {
     pub fn from_num(num: u16) -> Option<Self> {
         let tag = int_to_pin_name(num as u32)?;
         Some(Self { num, tag })
-    }
-
-    pub fn get_num(&self) -> u16 {
-        self.num
-    }
-
-    pub fn get_str(&self) -> &str {
-        &self.tag
     }
 }
 

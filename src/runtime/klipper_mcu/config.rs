@@ -6,6 +6,7 @@ use crate::{
     os::{GPIO, RpmsgEndpoint, Socket, sleep},
     runtime::klipper_mcu::{KlipperMCURuntime, identify::IdentifyResults},
     traits::Stream,
+    utils::pin::Pin,
 };
 
 impl KlipperMCURuntime {
@@ -32,7 +33,10 @@ impl KlipperMCURuntime {
         }
 
         let power_pin = if let Some(pin_str) = config.power_pin {
-            let gpio = GPIO::new(&pin_str, false)?;
+            let gpio = GPIO::new(
+                Pin::from_str(&pin_str).ok_or(err!("Invalid pin string '{pin_str}'"))?,
+                false,
+            )?;
             gpio.set(true);
             Some(gpio)
         } else {

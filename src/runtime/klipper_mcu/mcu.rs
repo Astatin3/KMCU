@@ -1,7 +1,7 @@
 use serde_json::json;
 
 use crate::{
-    error::Res,
+    Res,
     runtime::klipper_mcu::{KlipperMCURuntime, protocol::SendCommand},
     traits::MCU,
 };

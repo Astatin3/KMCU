@@ -1,4 +1,4 @@
-use crate::{traits::MCU, units};
+use crate::{traits::MCU, utils::units};
 
 pub trait Axis {
     // fn from_mcu(mcu: Rc<RefCell<dyn MCU>>, config: )

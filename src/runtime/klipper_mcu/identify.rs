@@ -4,7 +4,7 @@ use heapless::Vec;
 use miniz_oxide::inflate::{decompress_to_vec_with_limit, decompress_to_vec_zlib};
 use serde::Deserialize;
 
-use crate::error::Res;
+use crate::Res;
 use crate::runtime::klipper_mcu::{
     KlipperMCURuntime,
     protocol::{DictionaryRecv, DictionarySend, RecvCommand, SendCommand},

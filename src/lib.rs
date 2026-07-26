@@ -19,16 +19,12 @@ extern crate uom;
 
 // Add the err! macro everywhere mimicking anyhow::anyhow!
 #[macro_use]
-mod error;
+mod utils;
 
 mod config;
 mod gcode;
 mod os;
-mod pin;
 mod runtime;
-mod vlq;
-
-mod units;
 
 mod traits {
     mod axis;
@@ -43,4 +39,6 @@ mod traits {
     pub use stream::{Read, Stream, Write};
 }
 
-pub use crate::{config::PrinterConfig, error::Res, runtime::printer_runtime::PrinterRuntime};
+pub use crate::{
+    config::PrinterConfig, runtime::printer_runtime::PrinterRuntime, utils::error::Res,
+};

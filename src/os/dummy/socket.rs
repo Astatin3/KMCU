@@ -1,5 +1,5 @@
+use crate::Res;
 use crate::config::{SerialConnection, SocketConnection};
-use crate::error::Res;
 use crate::traits::{Read, Stream, Write};
 
 pub struct Socket {
@@ -13,7 +13,10 @@ impl Socket {
     }
 
     pub fn new_serial(config: SerialConnection) -> Res<Self> {
-        debug!("Dummy Socket: open serial '{}' at {} baud", config.path, config.baud);
+        debug!(
+            "Dummy Socket: open serial '{}' at {} baud",
+            config.path, config.baud
+        );
         Ok(Self {
             config: SocketConnection {
                 path: config.path,

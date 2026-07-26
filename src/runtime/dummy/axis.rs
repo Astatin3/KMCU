@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use crate::{
     config::DummyAxisConfig,
     traits::{Axis, MCU},
-    units::ShortTime,
+    utils::units::ShortTime,
 };
 
 pub struct DummyAxis {

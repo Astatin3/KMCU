@@ -3,8 +3,9 @@ use core::cell::RefCell;
 use alloc::{boxed::Box, collections::btree_map::BTreeMap, rc::Rc, string::String};
 
 use crate::{
+    Res,
     config::{AxisConfig, CoreXYKinematics},
-    error::Res,
+    runtime::dummy::DummyAxis,
     traits::{Axis, MCU},
 };
 
@@ -52,7 +53,8 @@ impl CoreXYRuntime {
                 .ok_or(err!("Could not find axis by name of {axis_name}"))?;
 
             let axis = match axis_config {
-                // AxisConfig::Dummy(dummy_axis_config) => DummyAxis::new(dummy_axis_config),
+                AxisConfig::Dummy(dummy_axis_config) => DummyAxis::new(dummy_axis_config),
+
                 _ => todo!(),
             };
 
