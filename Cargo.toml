@@ -14,7 +14,7 @@ platform_linux = ["std", "dep:libc"]
 heapless = "0.9.3"
 static_init = "1.0.4"
 thiserror = "2.0.19"
-uom = {version = "0.38.0", default-features = false, features = ["serde", "u32"]}
+uom = {version = "0.38.0", default-features = false, features = ["i32"]}
 
 # TOML parsing
 toml = "1.1.3"

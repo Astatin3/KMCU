@@ -16,7 +16,7 @@ fn get_libc_time() -> units::LongTime {
         if libc::clock_gettime(libc::CLOCK_REALTIME, &mut ts) == 0 {
             // Convert to milliseconds.
             // WARNING: This truncates to u32 range (overflows in 2038)
-            ((ts.tv_sec as u64 * 1000) + (ts.tv_nsec as u64 / 1_000_000)) as u32
+            ((ts.tv_sec as u64 * 1000) + (ts.tv_nsec as u64 / 1_000_000)) as i32
         } else {
             0 // Handle error appropriately
         }

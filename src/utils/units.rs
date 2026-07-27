@@ -1,7 +1,7 @@
 // This project needs a custom unit system so it can support high resolution units
 // on a u32 type
 
-//               Precision       Max value
+//               Precision       Max value (+/-)
 // Mass          0.1 g           429.5 tonnes
 //
 // ShortTime     1 microsecond   71.6 min
@@ -11,18 +11,26 @@
 // Velocity      0.1 mm/s        429.5 km/s
 // Acceleration  10 mm/s^2       42,950 m/s^2
 
-pub type Mass = u32::Mass;
-pub type ShortTime = u32::ShortTime;
-pub type LongTime = u32::LongTime;
-pub type Length = u32::Length;
-pub type Velocity = u32::Velocity;
-pub type Acceleration = u32::Acceleration;
+pub type Mass = i32::Mass;
+pub type ShortTime = i32::ShortTime;
+pub type LongTime = i32::LongTime;
+pub type Length = i32::Length;
+pub type Velocity = i32::Velocity;
+pub type Acceleration = i32::Acceleration;
 
+pub use acceleration::{
+    centimeter_per_second_squared, htmm_per_millisecond_squared, meter_per_second_squared,
+    millimeter_per_second_squared,
+};
 pub use length::{centimeter, htmm, meter, millimeter};
-pub use short_time::{short_microsecond, short_millisecond, short_minute, short_second};
-
 pub use long_time::{
     long_day, long_hour, long_microsecond, long_millisecond, long_minute, long_second,
+};
+pub use mass::{gram, kilogram};
+pub use short_time::{short_microsecond, short_millisecond, short_minute, short_second};
+use uom::Conversion;
+pub use velocity::{
+    centimeter_per_second, htmm_per_millisecond, meter_per_second, millimeter_per_second,
 };
 
 system! {
@@ -85,8 +93,8 @@ impl core::convert::TryFrom<LongTime> for ShortTime {
     }
 }
 
-mod u32 {
-    Q!(super, u32);
+mod i32 {
+    Q!(super, i32);
 }
 
 pub mod mass {

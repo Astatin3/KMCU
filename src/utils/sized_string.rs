@@ -17,6 +17,44 @@ impl<const N: usize> SizedString<N> {
         if index >= N { None } else { Some(&self[index]) }
     }
 
+    /// Parses self as a i32
+    pub fn parse_i32(&self) -> Option<i32> {
+        let mut n = 0;
+
+        // max is number of digits in the signed 32 bit integer limit plus a '-'
+        let max = N.max(11);
+
+        let (invert, range) = if self.0[0] == '-' {
+            (true, 1..max)
+        } else {
+            (false, 0..max)
+        };
+
+        for i in range {
+            n *= 10;
+
+            n += match self.0[i] {
+                '0' => 0,
+                '1' => 1,
+                '2' => 2,
+                '3' => 3,
+                '4' => 4,
+                '5' => 5,
+                '6' => 6,
+                '7' => 7,
+                '8' => 8,
+                '9' => 9,
+                _ => return None,
+            }
+        }
+
+        if invert {
+            n = -n;
+        }
+
+        Some(n)
+    }
+
     /// Sets one char to null
     pub fn clear(&mut self, index: usize) {
         if index >= N {
@@ -96,5 +134,22 @@ impl<const N: usize> Debug for SizedString<N> {
             }
         }
         Ok(())
+    }
+}
+
+impl<const N: usize> FromIterator<char> for SizedString<N> {
+    fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
+        let mut this = Self::new();
+
+        let mut iter = iter.into_iter();
+
+        for i in 0..N {
+            match iter.next() {
+                Some(c) => this[i] = c,
+                None => return this,
+            }
+        }
+
+        this
     }
 }

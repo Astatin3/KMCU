@@ -2,13 +2,13 @@
 type = "core_xy" # Different types of kinematics types are supported
 
 max_velocity = "500 mm/s"
-max_accel = 20000
-max_z_velocity = 50
-max_z_accel = 1200
-x_range=[0,256]
-y_range=[0,256]
-z_range=[0,256]
-square_corner_velocity=9.0
+max_accel = "20000 mm/s^2"
+max_z_velocity = "50 mm/s"
+max_z_accel = "1200 mm/s^2"
+x_range=["0 mm","256 mm"]
+y_range=["0 mm","256 mm"]
+z_range=["0 mm","256 mm"]
+square_corner_velocity="9.0 mm/s"
 
 # What MCUs hold what axes
 axis_x = ["mainboard", "stepper_x"]
@@ -24,7 +24,7 @@ connection = { type = "rpmsg", channel_name = "cpu_dsp0" }
 type = "klipper"
 
 power_pin = "PE17"
-start_delay = 500 # Wait for the printer to start after power on
+start_delay = "500 ms" # Wait for the printer to start after power on
 
 connection = {
     type = "serial",

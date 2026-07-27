@@ -1,7 +1,7 @@
 use alloc::string::String;
 use serde::Deserialize;
 
-use crate::utils::units::{self, Acceleration, Length, Velocity};
+use crate::utils::units::{self, Acceleration, Length, Velocity, velocity::millimeter_per_second};
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]

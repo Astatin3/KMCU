@@ -40,6 +40,8 @@ impl CoreXYRuntime {
     where
         Self: Sized,
     {
+        debug!("Kinematics config: {config:?}");
+
         let mut create_axis = |names: &(String, String)| -> Result<Box<dyn Axis>, RuntimeError> {
             let (mcu_name, axis_name) = names;
 
