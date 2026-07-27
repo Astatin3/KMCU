@@ -154,10 +154,7 @@ fn io_err_is_recoverable(e: &std::io::Error) -> bool {
 
 impl Read for RpmsgEndpoint {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
-        let fd = self
-            .data_fd
-            .as_mut()
-            .ok_or(IOError::NotConnected)?;
+        let fd = self.data_fd.as_mut().ok_or(IOError::NotConnected)?;
 
         match poll_then_read(fd, self.config.timeout, buf) {
             Ok(n) => Ok(n),
@@ -169,6 +166,13 @@ impl Read for RpmsgEndpoint {
             }
             Err(e) => Err(IOError::from(e))?,
         }
+    }
+
+    fn flush_input(&mut self) -> Result<(), IOError> {
+        if let Some(fd) = self.data_fd.as_ref() {
+            unsafe { libc::tcflush(fd.as_raw_fd(), libc::TCIFLUSH) };
+        }
+        Ok(())
     }
 }
 
@@ -230,7 +234,7 @@ impl Write for RpmsgEndpoint {
         }
     }
 
-    fn flush(&mut self) -> Result<(), IOError> {
+    fn flush_output(&mut self) -> Result<(), IOError> {
         if let Some(fd) = self.data_fd.as_mut() {
             fd.flush().map_err(IOError::from)?;
         }

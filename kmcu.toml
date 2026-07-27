@@ -23,13 +23,18 @@ connection = { type = "rpmsg", channel_name = "cpu_dsp0" }
 [mcu.toolhead]
 type = "klipper"
 
-power_pin = "PE17"
 start_delay = "500 ms" # Wait for the printer to start after power on
+
+connection_wrapper = {
+    type = "elegoo_a55a",
+    pin = "PE17"
+}
 
 connection = {
     type = "serial",
     path = "/dev/ttyS3",
-    baud = 250000
+    baud = 250000,
+    timeout = "100 ms"
 }
 
 [axis]

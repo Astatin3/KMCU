@@ -30,6 +30,10 @@ impl Read for Socket {
     fn read(&mut self, _buf: &mut [u8]) -> Result<usize, IOError> {
         Ok(0)
     }
+
+    fn flush_input(&mut self) -> Result<(), IOError> {
+        Ok(())
+    }
 }
 
 impl Write for Socket {
@@ -37,7 +41,7 @@ impl Write for Socket {
         Ok(buf.len())
     }
 
-    fn flush(&mut self) -> Result<(), IOError> {
+    fn flush_output(&mut self) -> Result<(), IOError> {
         Ok(())
     }
 }

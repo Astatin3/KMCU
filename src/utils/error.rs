@@ -40,6 +40,9 @@ pub enum MCUError {
 
     #[error("pin '{1}' -> {0}")]
     Pin(IOError, SizedString<4>),
+
+    #[error("Elegoo 0xA55A -> {0}")]
+    Elegoo0xA55A(IOError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -62,6 +65,9 @@ pub enum IOError {
     #[error("invalid pin")]
     InvalidPin,
 
+    #[error("invalid header '{header:20}'")]
+    InvalidHeader { header: u16 },
+
     #[error("Format error -> {0}")]
     Format(#[from] core::fmt::Error),
 
@@ -82,6 +88,9 @@ pub enum IOError {
 
     #[error("unregistered command id {id}")]
     UnregisteredCommand { id: i16 },
+
+    #[error("Unexpected command")]
+    UnexpectedCommand,
 
     #[error("Failed to fill whole buffer")]
     FailedToFillWholeBuffer,

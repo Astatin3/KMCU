@@ -1,8 +1,6 @@
 use alloc::string::String;
 use serde::Deserialize;
 
-use crate::config::pin::Pin;
-
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 pub enum AxisConfig {

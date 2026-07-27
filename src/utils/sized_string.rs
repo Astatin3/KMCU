@@ -103,13 +103,13 @@ impl<const N: usize> Index<usize> for SizedString<N> {
     type Output = char;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[N]
+        &self.0[index]
     }
 }
 
 impl<const N: usize> IndexMut<usize> for SizedString<N> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[N]
+        &mut self.0[index]
     }
 }
 

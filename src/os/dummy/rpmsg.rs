@@ -28,6 +28,10 @@ impl Read for RpmsgEndpoint {
     fn read(&mut self, _buf: &mut [u8]) -> Result<usize, IOError> {
         Ok(0)
     }
+
+    fn flush_input(&mut self) -> Result<(), IOError> {
+        Ok(())
+    }
 }
 
 impl Write for RpmsgEndpoint {
@@ -35,7 +39,7 @@ impl Write for RpmsgEndpoint {
         Ok(buf.len())
     }
 
-    fn flush(&mut self) -> Result<(), IOError> {
+    fn flush_output(&mut self) -> Result<(), IOError> {
         Ok(())
     }
 }

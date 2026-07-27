@@ -63,8 +63,8 @@ impl Write for CrcWriter<'_> {
         self.inner.write(buf)
     }
 
-    fn flush(&mut self) -> Result<(), IOError> {
-        self.inner.flush()
+    fn flush_output(&mut self) -> Result<(), IOError> {
+        self.inner.flush_output()
     }
 }
 

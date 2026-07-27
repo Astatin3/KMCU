@@ -14,10 +14,7 @@ pub struct Socket {
 
 impl Socket {
     pub fn new(config: SocketConnection) -> Result<Self, IOError> {
-        let fd = File::options()
-            .read(true)
-            .write(true)
-            .open(&config.path)?;
+        let fd = File::options().read(true).write(true).open(&config.path)?;
         debug!("Opened socket device '{}'", config.path);
         Ok(Self { fd, config })
     }
@@ -105,6 +102,12 @@ impl Read for Socket {
         self.poll_ready(self.fd.as_raw_fd(), libc::POLLIN)?;
         Ok(std::io::Read::read(&mut self.fd, buf).map_err(IOError::from)?)
     }
+
+    fn flush_input(&mut self) -> Result<(), IOError> {
+        let fd = self.fd.as_raw_fd();
+        unsafe { libc::tcflush(fd, libc::TCIFLUSH) };
+        Ok(())
+    }
 }
 
 impl Write for Socket {
@@ -113,7 +116,7 @@ impl Write for Socket {
         Ok(std::io::Write::write(&mut self.fd, buf).map_err(IOError::from)?)
     }
 
-    fn flush(&mut self) -> Result<(), IOError> {
+    fn flush_output(&mut self) -> Result<(), IOError> {
         std::io::Write::flush(&mut self.fd).map_err(IOError::from)?;
         Ok(())
     }

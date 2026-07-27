@@ -11,7 +11,7 @@ use crate::{
 
 pub struct CoreXYRuntime {
     config: CoreXYKinematics,
-    mcus: BTreeMap<String, Rc<RefCell<dyn MCU>>>,
+    mcus: BTreeMap<String, Box<dyn MCU>>,
 
     axis_x: Box<dyn Axis>,
     axis_y: Box<dyn Axis>,
@@ -20,11 +20,9 @@ pub struct CoreXYRuntime {
 }
 
 impl CoreXYRuntime {
-    pub fn alive(&self) -> Result<(), RuntimeError> {
-        for (name, mcu) in &self.mcus {
-            mcu.borrow_mut()
-                .alive()
-                .map_err(|e| RuntimeError::MCU(e, name.into()))?;
+    pub fn alive(&mut self) -> Result<(), RuntimeError> {
+        for (name, mcu) in &mut self.mcus {
+            mcu.alive().map_err(|e| RuntimeError::MCU(e, name.into()))?;
         }
 
         Ok(())
@@ -34,7 +32,7 @@ impl CoreXYRuntime {
         (config, mut axes, mcus): (
             CoreXYKinematics,
             BTreeMap<String, AxisConfig>,
-            BTreeMap<String, Rc<RefCell<dyn MCU>>>,
+            BTreeMap<String, Box<dyn MCU>>,
         ),
     ) -> Result<Self, RuntimeError>
     where
@@ -45,13 +43,10 @@ impl CoreXYRuntime {
         let mut create_axis = |names: &(String, String)| -> Result<Box<dyn Axis>, RuntimeError> {
             let (mcu_name, axis_name) = names;
 
-            let mcu = mcus
-                .get(mcu_name)
-                .ok_or(RuntimeError::MCU(
-                    MCUError::KlipperConnection(IOError::NotConnected),
-                    (mcu_name).into(),
-                ))?
-                .clone();
+            let mcu = mcus.get(mcu_name).ok_or(RuntimeError::MCU(
+                MCUError::KlipperConnection(IOError::NotConnected),
+                (mcu_name).into(),
+            ))?;
 
             let axis_config = axes.remove(axis_name).ok_or(RuntimeError::MCU(
                 MCUError::KlipperConnection(IOError::NotConnected),

@@ -1,12 +1,27 @@
-use crate::utils::units;
+use crate::{config::connection_wrapper::ConnectionWrapper, utils::units};
 use alloc::string::String;
 use serde::Deserialize;
 
 use crate::config::connection::Connection;
 
 #[derive(Debug, Deserialize)]
+pub struct MCUConfig {
+    pub connection: Connection,
+
+    // Sometimes the host must power the MCU
+    #[serde(default)]
+    pub connection_wrapper: ConnectionWrapper,
+
+    #[serde(default = "default_start_duration")]
+    pub start_delay: units::LongTime,
+
+    #[serde(flatten)]
+    pub inner: MCUConfigType,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
-pub enum MCUConfig {
+pub enum MCUConfigType {
     #[serde(rename = "sim")]
     Sim(SimMCUConfig),
     #[serde(rename = "klipper")]
@@ -21,16 +36,4 @@ fn default_start_duration() -> units::LongTime {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct KlipperMCU {
-    pub connection: Connection,
-
-    // Command to execute on startup.
-    // Useful for configuring sockets and such
-    pub exec_start: Option<String>,
-
-    // Sometimes the host must power the MCU via GPIO
-    pub power_pin: Option<String>,
-
-    #[serde(default = "default_start_duration")]
-    pub start_delay: units::LongTime,
-}
+pub struct KlipperMCU {}

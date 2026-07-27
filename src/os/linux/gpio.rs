@@ -4,7 +4,7 @@ use std::string::ToString;
 
 use alloc::{format, string::String};
 
-use crate::{utils::{error::IOError, pin::Pin}};
+use crate::utils::{error::IOError, pin::Pin};
 
 const GPIO_PREFIX: &str = "/sys/class/gpio";
 
@@ -54,7 +54,7 @@ impl GPIO {
         set_pin_direction(pin.num, false)?;
 
         // Set to the default value
-        set_pin_value(pin.num, invert)?;
+        // set_pin_value(pin.num, invert)?;
 
         debug!("Initialized GPIO pin '{}'", pin.tag);
 
@@ -62,8 +62,9 @@ impl GPIO {
     }
 
     pub fn set(&self, value: bool) -> Result<(), IOError> {
+        let value = value ^ self.invert;
         debug!("Set GPIO pin '{}' to '{value}'", self.pin.tag);
-        set_pin_value(self.pin.num, value ^ self.invert)
+        set_pin_value(self.pin.num, value)
     }
 }
 

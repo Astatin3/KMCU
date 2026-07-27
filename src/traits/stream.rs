@@ -8,6 +8,7 @@ pub trait Stream: Read + Write {}
 
 pub trait Read {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError>;
+    fn flush_input(&mut self) -> Result<(), IOError>;
 
     fn is_read_vectored(&self) -> bool {
         false
@@ -63,7 +64,7 @@ pub trait Read {
 
 pub trait Write {
     fn write(&mut self, buf: &[u8]) -> Result<usize, IOError>;
-    fn flush(&mut self) -> Result<(), IOError>;
+    fn flush_output(&mut self) -> Result<(), IOError>;
 
     fn is_write_vectored(&self) -> bool {
         false
@@ -125,5 +126,9 @@ impl Read for &[u8] {
         buf[..amt].copy_from_slice(a);
         *self = b;
         Ok(amt)
+    }
+
+    fn flush_input(&mut self) -> Result<(), IOError> {
+        Ok(())
     }
 }

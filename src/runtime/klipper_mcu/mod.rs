@@ -30,7 +30,5 @@ pub struct KlipperMCURuntime {
     pub stream: Box<dyn Stream>,
     pub seq: u8,
 
-    pub power_pin: Option<GPIO>,
-
     pub identity: IdentifyResults,
 }

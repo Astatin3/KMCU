@@ -16,7 +16,7 @@ fn run() -> Result<(), MajorStateError> {
 
     let config = PrinterConfig::parse(include_str!("../kmcu.toml"))?;
 
-    let printer = PrinterRuntime::from_config(config)?;
+    let mut printer = PrinterRuntime::from_config(config)?;
 
     printer.alive()?;
     info!("Printer is alive!");

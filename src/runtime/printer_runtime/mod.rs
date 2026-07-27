@@ -1,12 +1,15 @@
 use core::cell::RefCell;
 
-use alloc::{collections::btree_map::BTreeMap, rc::Rc};
+use alloc::{boxed::Box, collections::btree_map::BTreeMap, rc::Rc};
 
 use crate::{
-    config::{Kinematics, MCUConfig, PrinterConfig},
-    runtime::{core_xy::CoreXYRuntime, dummy::SimMCURuntime, klipper_mcu::KlipperMCURuntime},
+    config::{Kinematics, MCUConfig, MCUConfigType, PrinterConfig},
+    runtime::{
+        connection::init_connection_with_wrapper, core_xy::CoreXYRuntime, dummy::SimMCURuntime,
+        klipper_mcu::KlipperMCURuntime,
+    },
     traits::MCU,
-    utils::error::{RuntimeError, RuntimeInitError},
+    utils::error::{MCUError, RuntimeError, RuntimeInitError},
 };
 
 pub struct PrinterRuntime {
@@ -14,7 +17,7 @@ pub struct PrinterRuntime {
 }
 
 impl PrinterRuntime {
-    pub fn alive(&self) -> Result<(), RuntimeError> {
+    pub fn alive(&mut self) -> Result<(), RuntimeError> {
         self.kinematics.alive()
     }
 
@@ -22,20 +25,51 @@ impl PrinterRuntime {
     where
         Self: Sized,
     {
+        #[cfg(feature = "std")]
+        if let Some(command) = config.exec_start {
+            match std::process::Command::new("/bin/sh")
+                .arg("-c")
+                .arg(&command)
+                .output()
+            {
+                Ok(o) => {
+                    if o.status.success() {
+                        info!("Ran command '{command}'")
+                    } else {
+                        warn!("Command '{command}' resulted in error {}", o.status);
+                    }
+                }
+                Err(_) => warn!("Command '{command}' failed to run!"),
+            }
+        }
+
         let mut mcus = BTreeMap::new(); // with_capacity(config.mcu.len());
 
         for (name, mcu_config) in config.mcu {
             debug!("Initializing runtime '{name}'");
 
-            let mcu = match mcu_config {
-                MCUConfig::Sim(sim_mcuconfig) => {
-                    Rc::new(RefCell::new(SimMCURuntime::from_config(sim_mcuconfig)?))
-                        as Rc<RefCell<dyn MCU>>
+            let MCUConfig {
+                connection,
+                connection_wrapper: wrapper,
+                start_delay,
+                inner,
+            } = mcu_config;
+
+            let stream = init_connection_with_wrapper(connection, wrapper)
+                .map_err(|e: MCUError| RuntimeInitError::MCU(e, (&name).into()))?;
+
+            let mcu = match inner {
+                MCUConfigType::Sim(sim_mcuconfig) => Box::new(
+                    SimMCURuntime::from_config(sim_mcuconfig)
+                        .map_err(|e: MCUError| RuntimeInitError::MCU(e, (&name).into()))?,
+                ),
+
+                MCUConfigType::Klipper(klipper_mcuconfig) => {
+                    let klipper = KlipperMCURuntime::from_config(stream, klipper_mcuconfig)
+                        .map_err(|e: MCUError| RuntimeInitError::MCU(e, (&name).into()))?;
+
+                    Box::new(klipper) as Box<dyn MCU>
                 }
-                MCUConfig::Klipper(klipper_mcuconfig) => Rc::new(RefCell::new(
-                    KlipperMCURuntime::from_config(klipper_mcuconfig)
-                        .map_err(|e| RuntimeInitError::MCU(e, (&name).into()))?,
-                )) as Rc<RefCell<dyn MCU>>,
             };
 
             info!("Initialized runtime '{name}'");
