@@ -21,5 +21,7 @@ fn run() -> Result<(), MajorStateError> {
     printer.alive()?;
     info!("Printer is alive!");
 
+    printer.kinematics.test_x();
+
     Ok(())
 }

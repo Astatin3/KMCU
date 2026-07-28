@@ -4,7 +4,7 @@ mod connection_wrapper;
 mod kinematics;
 mod mcu;
 
-use alloc::{collections::btree_map::BTreeMap, string::String};
+use alloc::{collections::btree_map::BTreeMap, string::String, vec::Vec};
 pub use axis::*;
 pub use connection::*;
 pub use connection_wrapper::ConnectionWrapper;
@@ -26,8 +26,6 @@ pub struct PrinterConfig {
 
     #[serde(default)]
     pub mcu: BTreeMap<String, MCUConfig>,
-    #[serde(default)]
-    pub axis: BTreeMap<String, AxisConfig>,
 }
 
 impl PrinterConfig {

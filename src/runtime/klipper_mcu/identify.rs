@@ -13,37 +13,30 @@ use crate::{
     utils::error::{IOError, MCUError},
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct IdentifyResults {
     pub app: String,
     pub version: String,
     pub build_versions: String,
     pub license: String,
-    pub config: BTreeMap<String, serde_json::Value>,
+    pub config: Config,
     pub enumerations: BTreeMap<String, BTreeMap<String, serde_json::Value>>,
 
     pub commands: DictionarySend,
     pub responses: DictionaryRecv,
 }
 
+#[derive(Deserialize, Default)]
+pub struct Config {
+    /// The rate that the clock moves
+    /// stepper for klipper MCUs are related to this
+    #[serde(rename = "CLOCK_FREQ")]
+    pub clock_freq: u32,
+}
+
 impl IdentifyResults {
-    pub fn empty() -> Self {
-        Self {
-            app: String::new(),
-            version: String::new(),
-            build_versions: String::new(),
-            license: String::new(),
-            config: BTreeMap::new(),
-            enumerations: BTreeMap::new(),
-
-            commands: DictionarySend::default_dict(),
-            responses: DictionaryRecv::default_dict(),
-        }
-    }
-
     pub fn from_zlib_bytes(zlib_bytes: &[u8]) -> Result<Self, IOError> {
-        let decompressed =
-            decompress_to_vec_zlib(zlib_bytes).map_err(IOError::ZllibDecode)?;
+        let decompressed = decompress_to_vec_zlib(zlib_bytes).map_err(IOError::ZllibDecode)?;
 
         let mut s = String::from_utf8(decompressed).map_err(|_| IOError::InvalidUTF8)?;
 
@@ -60,22 +53,20 @@ impl KlipperMCURuntime {
     /// Reads the identify table from the MCU, decompresses it, and parses the
     /// JSON to produce `IdentifyResults` (including populated command/response
     /// dictionaries).
-    pub fn identify(&mut self) -> Result<IdentifyResults, MCUError> {
+    pub fn identify(&mut self) -> Result<IdentifyResults, IOError> {
         let mut i = 0;
         let mut zlib_bytes = Vec::<_, 4096>::new(); // 4 KB should be enough memory to store the JSON
 
         loop {
             let byte_start = (i * IDENTIFY_COUNT) as u32;
 
-            self.send_command(SendCommand::identify {
+            let cmd = self.send_command_expect_reponse(SendCommand::identify {
                 offset: byte_start,
                 count: IDENTIFY_COUNT as u8,
             })?;
 
-            let cmd = self.recv_frame_or_ack()?;
-
             match cmd {
-                Some(RecvCommand::identify_response { offset, data }) => {
+                RecvCommand::identify_response { offset, data } => {
                     // If the MCU returned no new data, assume that's the end
                     if data.is_empty() {
                         break;
@@ -93,6 +84,6 @@ impl KlipperMCURuntime {
             };
         }
 
-        IdentifyResults::from_zlib_bytes(&zlib_bytes).map_err(MCUError::KlipperConnection)
+        IdentifyResults::from_zlib_bytes(&zlib_bytes)
     }
 }

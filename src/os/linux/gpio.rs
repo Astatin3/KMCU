@@ -14,7 +14,7 @@ fn write_to_file(path: String, data: &str) -> Result<(), IOError> {
     std::fs::write(&path, data).map_err(IOError::from)
 }
 
-fn set_pin_export(pin_int: u16, export: bool) -> Result<(), IOError> {
+fn set_pin_export(pin_int: u8, export: bool) -> Result<(), IOError> {
     write_to_file(
         format!(
             "{GPIO_PREFIX}/{}",
@@ -24,14 +24,14 @@ fn set_pin_export(pin_int: u16, export: bool) -> Result<(), IOError> {
     )
 }
 
-fn set_pin_direction(pin_int: u16, direction: bool) -> Result<(), IOError> {
+fn set_pin_direction(pin_int: u8, direction: bool) -> Result<(), IOError> {
     write_to_file(
         format!("{GPIO_PREFIX}/gpio{pin_int}/direction"),
         if direction { "in" } else { "out" },
     )
 }
 
-fn set_pin_value(pin_int: u16, value: bool) -> Result<(), IOError> {
+fn set_pin_value(pin_int: u8, value: bool) -> Result<(), IOError> {
     write_to_file(
         format!("{GPIO_PREFIX}/gpio{pin_int}/value"),
         if value { "1" } else { "0" },
@@ -39,13 +39,13 @@ fn set_pin_value(pin_int: u16, value: bool) -> Result<(), IOError> {
 }
 
 pub struct GPIO {
-    pin: Pin,
+    pin: Pin<5>,
 
     invert: bool,
 }
 
 impl GPIO {
-    pub fn new(pin: Pin, invert: bool) -> Result<Self, IOError> {
+    pub fn new(pin: Pin<5>, invert: bool) -> Result<Self, IOError> {
         // The result is ignored since this might
         // return an error because if already exported
         let _ = set_pin_export(pin.num, true);

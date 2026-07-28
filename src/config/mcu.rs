@@ -1,5 +1,8 @@
-use crate::{config::connection_wrapper::ConnectionWrapper, utils::units};
-use alloc::string::String;
+use crate::{
+    config::{AxisConfig, connection_wrapper::ConnectionWrapper},
+    utils::units,
+};
+use alloc::{collections::BTreeMap, string::String};
 use serde::Deserialize;
 
 use crate::config::connection::Connection;
@@ -36,4 +39,6 @@ fn default_start_duration() -> units::LongTime {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct KlipperMCU {}
+pub struct KlipperMCU {
+    pub axis: BTreeMap<String, AxisConfig>,
+}

@@ -4,8 +4,10 @@ use crate::traits::Stream;
 
 mod axes {
     mod a4988;
+    mod tmc2209;
 
     pub use a4988::KA4988;
+    pub use tmc2209::KTMC2209;
 }
 
 mod config;

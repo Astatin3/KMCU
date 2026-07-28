@@ -52,16 +52,6 @@ impl DictionarySend {
         }
     }
 
-    /// Creates a dictionary pre-populated with the default commands.
-    ///
-    /// The default set includes only the `identify` command, which is
-    /// always available before full MCU initialization.
-    pub fn default_dict() -> Self {
-        let mut dict = DictionarySend::new();
-        dict.add_definition(SendCommand::id_for_name("identify"), 1);
-        dict
-    }
-
     /// Looks up the dynamic ID for a given static command ID.
     ///
     /// Returns `None` if the static ID is out of bounds or not registered.
@@ -89,6 +79,18 @@ impl DictionarySend {
         }
 
         self.from_static_id[static_id as usize] = dynamic_id;
+    }
+}
+
+impl Default for DictionarySend {
+    /// Creates a dictionary pre-populated with the default commands.
+    ///
+    /// The default set includes only the `identify` command, which is
+    /// always available before full MCU initialization.
+    fn default() -> Self {
+        let mut dict = DictionarySend::new();
+        dict.add_definition(SendCommand::id_for_name("identify"), 1);
+        dict
     }
 }
 
@@ -154,16 +156,6 @@ impl DictionaryRecv {
         }
     }
 
-    /// Creates a dictionary pre-populated with the default commands.
-    ///
-    /// The default set includes only the `identify_response` command,
-    /// which is always available before full MCU initialization.
-    pub fn default_dict() -> Self {
-        let mut dict = DictionaryRecv::new();
-        dict.add_definition(RecvCommand::id_for_name("identify_response"), 0);
-        dict
-    }
-
     /// Looks up the static ID for a given dynamic command ID.
     ///
     /// The dynamic ID is offset by `DYNAMIC_ID_OFFSET` before indexing.
@@ -195,6 +187,18 @@ impl DictionaryRecv {
         }
 
         self.to_static_id[(dynamic_id + DYNAMIC_ID_OFFSET) as usize] = static_id;
+    }
+}
+
+impl Default for DictionaryRecv {
+    /// Creates a dictionary pre-populated with the default commands.
+    ///
+    /// The default set includes only the `identify_response` command,
+    /// which is always available before full MCU initialization.
+    fn default() -> Self {
+        let mut dict = DictionaryRecv::new();
+        dict.add_definition(RecvCommand::id_for_name("identify_response"), 0);
+        dict
     }
 }
 

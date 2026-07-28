@@ -8,21 +8,18 @@ use crate::{
 };
 
 impl KlipperMCURuntime {
-    pub fn send_command(&mut self, command: SendCommand) -> Result<(), MCUError> {
-        trace!("Sent command '{command:?}'");
+    fn send_command(&mut self, command: SendCommand) -> Result<(), IOError> {
+        trace!("Sent command seq:{} '{command:?}'", self.seq);
 
         let frame = Frame::send(self.seq, command);
-        frame
-            .encode(&mut *self.stream, &self.identity.commands)
-            .map_err(MCUError::KlipperProtocol)?;
+        frame.encode(&mut *self.stream, &self.identity.commands)?;
 
         Ok(())
     }
 
     /// Receive a frame and decode its payload as a command, or `None` for an ACK/NAK.
-    pub fn recv_frame_or_ack(&mut self) -> Result<Option<RecvCommand>, MCUError> {
-        let frame = Frame::decode(&mut *self.stream, &self.identity.responses)
-            .map_err(MCUError::KlipperConnection)?;
+    fn recv_command(&mut self) -> Result<Option<RecvCommand>, IOError> {
+        let frame = Frame::decode(&mut *self.stream, &self.identity.responses)?;
 
         self.seq = frame.seq();
 
@@ -36,12 +33,29 @@ impl KlipperMCURuntime {
         }
     }
 
+    pub fn send_command_expect_ack(&mut self, command: SendCommand) -> Result<(), IOError> {
+        self.send_command(command)?;
+
+        let frame = self.recv_command()?;
+
+        match frame {
+            None => Ok(()),
+            Some(_) => Err(IOError::UnexpectedData),
+        }
+    }
+
     /// Receive a command but expect it to not be blank
-    pub fn recv_command(&mut self) -> Result<RecvCommand, MCUError> {
-        match self.recv_frame_or_ack() {
-            Ok(Some(cmd)) => Ok(cmd),
-            Ok(None) => Err(MCUError::KlipperConnection(IOError::UnexpectedNullData)),
-            Err(e) => Err(e),
+    pub fn send_command_expect_reponse(
+        &mut self,
+        command: SendCommand,
+    ) -> Result<RecvCommand, IOError> {
+        self.send_command(command)?;
+
+        let frame = self.recv_command()?;
+
+        match frame {
+            Some(cmd) => Ok(cmd),
+            None => Err(IOError::UnexpectedNullData),
         }
     }
 }

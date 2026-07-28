@@ -22,6 +22,8 @@ pub enum ConfigError {
 pub enum RuntimeInitError {
     #[error("In MCU '{1}' -> {0}")]
     MCU(MCUError, SizedString<16>),
+    #[error("Core XY -> {0}")]
+    CoreXY(MCUError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -34,15 +36,21 @@ pub enum RuntimeError {
 pub enum MCUError {
     #[error("Klipper connection -> {0}")]
     KlipperConnection(IOError),
-
     #[error("Klipper protocol -> {0}")]
     KlipperProtocol(IOError),
+    #[error("Klipper init oids -> {0}")]
+    KlipperInitOIDs(IOError),
 
     #[error("pin '{1}' -> {0}")]
     Pin(IOError, SizedString<4>),
+    #[error("axis '{1}' -> {0}")]
+    Axis(IOError, SizedString<16>),
 
     #[error("Elegoo 0xA55A -> {0}")]
     Elegoo0xA55A(IOError),
+
+    #[error("Alive check failed -> {0}")]
+    AliveCheckFailed(IOError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -52,6 +60,8 @@ pub enum IOError {
 
     #[error("Unexpected null data")]
     UnexpectedNullData,
+    #[error("Unexpected data")]
+    UnexpectedData,
 
     #[error("Linux I/O error '{errno}'")]
     Linux { errno: i32 },
@@ -94,6 +104,9 @@ pub enum IOError {
 
     #[error("Failed to fill whole buffer")]
     FailedToFillWholeBuffer,
+
+    #[error("TMC UART verification failed")]
+    TmcUartVerificationFailed,
 }
 
 #[cfg(feature = "platform_linux")]
@@ -115,13 +128,5 @@ impl From<std::ffi::NulError> for IOError {
 impl From<MCUError> for RuntimeInitError {
     fn from(e: MCUError) -> Self {
         RuntimeInitError::MCU(e, SizedString::new())
-    }
-}
-
-impl From<RuntimeError> for RuntimeInitError {
-    fn from(e: RuntimeError) -> Self {
-        match e {
-            RuntimeError::MCU(mcu, name) => RuntimeInitError::MCU(mcu, name),
-        }
     }
 }

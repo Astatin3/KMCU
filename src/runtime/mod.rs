@@ -2,6 +2,7 @@
 pub mod klipper_mcu;
 
 pub mod core_xy;
+mod device_map;
 pub mod printer_runtime;
 
 mod connection;

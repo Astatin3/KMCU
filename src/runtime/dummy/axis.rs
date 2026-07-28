@@ -21,11 +21,7 @@ impl DummyAxis {
 }
 
 impl Axis for DummyAxis {
-    fn step(&mut self, mcu: &mut dyn MCU, count: i32, _interval: ShortTime) {
-        self.position += (count as f32) * self.config.step_amount_mm;
-    }
-
-    fn register_self(&mut self, mcu: &mut dyn MCU)
+    fn simple_move(&mut self, velocity: crate::utils::units::Velocity)
     where
         Self: Sized,
     {

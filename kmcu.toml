@@ -11,35 +11,35 @@ z_range=["0","256 mm"]
 square_corner_velocity="9.0 mm/s"
 
 # What MCUs hold what axes
-axis_x = ["mainboard", "stepper_x"]
-axis_y = ["mainboard", "stepper_y"]
-axis_z = ["mainboard", "stepper_z"]
-axis_extruder = ["toolhead", "stepper_extruder"]
+# axis_x = ["mainboard", "stepper_x"]
+# axis_y = ["mainboard", "stepper_y"]
+# axis_z = ["mainboard", "stepper_z"]
+# axis_extruder = ["toolhead", "stepper_extruder"]
 
 [mcu.mainboard]
 type = "klipper"
 connection = { type = "rpmsg", channel_name = "cpu_dsp0" }
 
-[mcu.toolhead]
-type = "klipper"
+# [mcu.toolhead]
+# type = "klipper"
 
-start_delay = "500 ms" # Wait for the printer to start after power on
+# start_delay = "500 ms" # Wait for the printer to start after power on
 
-connection_wrapper = {
-    type = "elegoo_a55a",
-    pin = "PE17"
-}
+# connection_wrapper = {
+#     type = "elegoo_a55a",
+#     pin = "PE17"
+# }
 
-connection = {
-    type = "serial",
-    path = "/dev/ttyS3",
-    baud = 250000,
-    timeout = "100 ms"
-}
+# connection = {
+#     type = "serial",
+#     path = "/dev/ttyS3",
+#     baud = 250000,
+#     timeout = "100 ms"
+# }
 
-[axis]
-stepper_x = { type = "dummy" }
-stepper_y = { type = "dummy" }
-stepper_z = { type = "dummy" }
+[mcu.mainboard.axis]
+axis_x = { type = "tmc2209", step_pin = "PG18", dir_pin = "!PF1", uart_pin = "PE6", tx_pin = "PE7", run_current = 1.2, hold_current = 0.8, sense_resistor = 0.1, driver_SGTHRS = 130, diag_pin = "PF0", rotation_distance = "39.872 mm", full_steps_per_rotation = 200, microsteps = 16 }
+axis_y = { type = "dummy" }
+axis_z = { type = "dummy" }
 
-stepper_extruder = { type = "dummy" }
+axis_e = { type = "dummy" }

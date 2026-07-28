@@ -1,19 +1,19 @@
 use core::cell::RefCell;
 
-use alloc::{boxed::Box, collections::btree_map::BTreeMap, rc::Rc};
+use alloc::{boxed::Box, collections::btree_map::BTreeMap, rc::Rc, vec::Vec};
 
 use crate::{
     config::{Kinematics, MCUConfig, MCUConfigType, PrinterConfig},
     runtime::{
-        connection::init_connection_with_wrapper, core_xy::CoreXYRuntime, dummy::SimMCURuntime,
-        klipper_mcu::KlipperMCURuntime,
+        connection::init_connection_with_wrapper, core_xy::CoreXYRuntime, device_map::DeviceMap,
+        dummy::SimMCURuntime, klipper_mcu::KlipperMCURuntime,
     },
     traits::MCU,
     utils::error::{MCUError, RuntimeError, RuntimeInitError},
 };
 
 pub struct PrinterRuntime {
-    kinematics: CoreXYRuntime,
+    pub kinematics: CoreXYRuntime,
 }
 
 impl PrinterRuntime {
@@ -43,45 +43,42 @@ impl PrinterRuntime {
             }
         }
 
-        let mut mcus = BTreeMap::new(); // with_capacity(config.mcu.len());
+        let mut device_map = DeviceMap::default();
+        let mut mcus = Vec::with_capacity(config.mcu.len());
 
         for (name, mcu_config) in config.mcu {
             debug!("Initializing runtime '{name}'");
 
             let MCUConfig {
                 connection,
-                connection_wrapper: wrapper,
+                connection_wrapper,
                 start_delay,
                 inner,
             } = mcu_config;
 
-            let stream = init_connection_with_wrapper(connection, wrapper)
+            let stream = init_connection_with_wrapper(connection, connection_wrapper)
                 .map_err(|e: MCUError| RuntimeInitError::MCU(e, (&name).into()))?;
 
             let mcu = match inner {
-                MCUConfigType::Sim(sim_mcuconfig) => Box::new(
-                    SimMCURuntime::from_config(sim_mcuconfig)
-                        .map_err(|e: MCUError| RuntimeInitError::MCU(e, (&name).into()))?,
-                ),
+                MCUConfigType::Sim(sim_mcuconfig) => SimMCURuntime::from_config(sim_mcuconfig)
+                    .map_err(|e: MCUError| RuntimeInitError::MCU(e, (&name).into()))?,
 
                 MCUConfigType::Klipper(klipper_mcuconfig) => {
-                    let klipper = KlipperMCURuntime::from_config(stream, klipper_mcuconfig)
-                        .map_err(|e: MCUError| RuntimeInitError::MCU(e, (&name).into()))?;
-
-                    Box::new(klipper) as Box<dyn MCU>
+                    KlipperMCURuntime::from_config(stream, klipper_mcuconfig, &mut device_map)
+                        .map_err(|e: MCUError| RuntimeInitError::MCU(e, (&name).into()))?
                 }
             };
 
             info!("Initialized runtime '{name}'");
 
-            mcus.insert(name, mcu);
+            mcus.push((name, mcu));
         }
 
         info!("Registered {} MCUs", mcus.len());
 
         let kinematics = match config.kinematics {
             Kinematics::CoreXY(core_xykinematics) => {
-                CoreXYRuntime::from_config((core_xykinematics, config.axis, mcus))?
+                CoreXYRuntime::from_config(core_xykinematics, device_map, mcus)?
             }
         };
 

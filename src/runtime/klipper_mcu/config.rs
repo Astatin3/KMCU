@@ -1,10 +1,21 @@
-use alloc::boxed::Box;
+use core::cell::RefCell;
+
+use alloc::{boxed::Box, rc::Rc};
 
 use crate::{
-    config::{Connection, ConnectionWrapper, KlipperMCU},
+    config::{A4988Config, AxisConfig, Connection, ConnectionWrapper, KlipperMCU},
     os::{GPIO, RpmsgEndpoint, Socket, sleep},
-    runtime::klipper_mcu::{KlipperMCURuntime, identify::IdentifyResults},
-    traits::Stream,
+    runtime::{
+        device_map::DeviceMap,
+        dummy::DummyAxis,
+        klipper_mcu::{
+            KlipperMCURuntime,
+            axes::{KA4988, KTMC2209},
+            identify::IdentifyResults,
+            protocol::SendCommand,
+        },
+    },
+    traits::{Axis, MCU, Stream},
     utils::{
         error::{IOError, MCUError},
         pin::Pin,
@@ -12,33 +23,80 @@ use crate::{
 };
 
 impl KlipperMCURuntime {
-    pub fn from_config(stream: Box<dyn Stream>, config: KlipperMCU) -> Result<Self, MCUError>
+    pub fn from_config(
+        stream: Box<dyn Stream>,
+        config: KlipperMCU,
+        device_map: &mut DeviceMap,
+    ) -> Result<Rc<RefCell<dyn MCU>>, MCUError>
     where
         Self: Sized,
     {
-        // let power_pin = if let Some(pin_str) = config.power_pin {
-        //     let gpio = GPIO::new(
-        //         Pin::from_str(&pin_str)
-        //             .ok_or(MCUError::Pin(IOError::InvalidPin, (&pin_str).into()))?,
-        //         false,
-        //     )
-        //     .map_err(|e| MCUError::Pin(e, (&pin_str).into()))?;
-
-        //     gpio.set(true).map_err(MCUError::KlipperConnection)?;
-        //     Some(gpio)
-        // } else {
-        //     None
-        // };
-
         let mut this = Self {
             stream,
             seq: 0,
-            identity: IdentifyResults::empty(),
+            identity: IdentifyResults::default(),
         };
 
         // Run the identify sequence
-        this.identity = this.identify()?;
+        this.identity = this.identify().map_err(MCUError::KlipperConnection)?;
+
+        // Count the OIDs and allocate them
+        this.send_command_expect_ack(SendCommand::allocate_oids {
+            count: Self::count_oids(&config),
+        })
+        .map_err(|e| MCUError::KlipperInitOIDs(e))?;
+
+        // Convert this into an Rc<RefCell<>> for easy access
+        let this = Rc::new(RefCell::new(this));
+        let mut current_oid_count = 0;
+
+        // Have each device write their configs
+        for axis in config.axis {
+            match axis {
+                (name, AxisConfig::Dummy(config)) => {
+                    let axis = DummyAxis::new(config);
+                    device_map.axes.insert(name, axis);
+                }
+                (name, AxisConfig::A4988(config)) => {
+                    let axis = KA4988::new(config, current_oid_count, this.clone())
+                        .map_err(|e| MCUError::Axis(e, (&name).into()))?;
+
+                    device_map.axes.insert(name, axis);
+
+                    current_oid_count += 1;
+                }
+                (name, AxisConfig::Tmc2209(config)) => {
+                    let axis = KTMC2209::new(config, current_oid_count, this.clone())
+                        .map_err(|e| MCUError::Axis(e, (&name).into()))?;
+
+                    device_map.axes.insert(name, axis);
+
+                    current_oid_count += 2;
+                }
+            };
+        }
+
+        // TODO: actually calculate a good CRC for finalize_config
+
+        this.borrow_mut()
+            .send_command_expect_ack(SendCommand::finalize_config { crc: 0 })
+            .map_err(|e| MCUError::KlipperInitOIDs(e));
 
         Ok(this)
+    }
+
+    /// Register OID count
+    pub fn count_oids(config: &KlipperMCU) -> u8 {
+        let mut total_oids = 0;
+
+        for axis in &config.axis {
+            total_oids += match axis {
+                (_, AxisConfig::Dummy(_)) => 0,
+                (_, AxisConfig::A4988(_)) => 1,
+                (_, AxisConfig::Tmc2209(_)) => 2,
+            };
+        }
+
+        total_oids
     }
 }
