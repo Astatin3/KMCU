@@ -4,7 +4,7 @@ use crate::{
         dictionary::{DictionaryRecv, DictionarySend},
     },
     traits::{Binary, Read, Write},
-    utils::error::IOError,
+    utils::{CRC16_INITIAL, crc16_ccitt, crc16_final, crc16_update, error::IOError},
 };
 
 pub const MESSAGE_MIN: usize = 5;
@@ -23,22 +23,6 @@ fn decompose_sequence_number(composed: u8) -> u8 {
     composed & MESSAGE_SEQ_MASK
 }
 
-fn crc16_update(mut crc: u16, byte: u8) -> u16 {
-    let mut data: u16 = byte as u16;
-    data ^= crc & 0xff;
-    data ^= (data & 0x0f) << 4;
-    crc = ((data << 8) | (crc >> 8)) ^ (data >> 4) ^ (data << 3);
-    crc
-}
-
-pub(crate) fn crc16_ccitt(buf: &[u8]) -> [u8; 2] {
-    let mut crc: u16 = 0xffff;
-    for &byte in buf {
-        crc = crc16_update(crc, byte);
-    }
-    [(crc >> 8) as u8, (crc & 0xff) as u8]
-}
-
 /// A writer wrapper that computes CRC16-CCITT on the fly as bytes pass through.
 pub(crate) struct CrcWriter<'a> {
     inner: &'a mut dyn Write,
@@ -47,11 +31,14 @@ pub(crate) struct CrcWriter<'a> {
 
 impl<'a> CrcWriter<'a> {
     pub fn new(inner: &'a mut dyn Write) -> Self {
-        Self { inner, crc: 0xffff }
+        Self {
+            inner,
+            crc: CRC16_INITIAL,
+        }
     }
 
     pub fn finish(self) -> (&'a mut dyn Write, [u8; 2]) {
-        (self.inner, [(self.crc >> 8) as u8, (self.crc & 0xff) as u8])
+        (self.inner, crc16_final(self.crc))
     }
 }
 

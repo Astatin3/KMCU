@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use crate::{
     traits::{Binary, Read, Write},
-    utils::error::IOError,
+    utils::{crc16_ccitt, error::IOError},
 };
 
 /// Commands in the Elegoo 0xA55A bootloader protocol.
@@ -62,10 +62,7 @@ pub enum BootloaderCmd {
     ///
     /// Confirms that the chunk at `offset` was written, referencing the
     /// total `length` from the original program command.
-    ProgramAck {
-        length: u32,
-        offset: u32,
-    },
+    ProgramAck { length: u32, offset: u32 },
 
     /// Host → bootloader: jump to the main application firmware.
     ///
@@ -233,17 +230,6 @@ impl Binary for BootloaderCmd {
         };
         7 + payload_len
     }
-}
-
-fn crc16_ccitt(buf: &[u8]) -> [u8; 2] {
-    let mut crc: u16 = 0xffff;
-    for &byte in buf {
-        let mut data = byte as u16;
-        data ^= crc & 0xff;
-        data ^= (data & 0x0f) << 4;
-        crc = ((data << 8) | (crc >> 8)) ^ (data >> 4) ^ (data << 3);
-    }
-    [(crc >> 8) as u8, (crc & 0xff) as u8]
 }
 
 fn scan_for_magic(reader: &mut dyn Read) -> Result<(), IOError> {
