@@ -38,17 +38,22 @@ where
         return Err(Error::custom("Input must start with a valid number"));
     }
 
+    let num_str: alloc::string::String =
+        num_str.chars().filter(|c| *c != '_' && *c != ',').collect();
+
+    let num: f32 = num_str.parse().map_err(|_| Error::custom("Not a number"))?;
+
+    // Return unitless because the unit doesn't matter.
+    if num == 0. {
+        return Ok((num, ""));
+    }
+
     // Validate Unit Presence
     if unit_str.is_empty() {
         return Err(Error::custom(
             "Missing unit: value must include both a number and a unit (e.g., '500 mm/s')",
         ));
     }
-
-    let num_str: alloc::string::String =
-        num_str.chars().filter(|c| *c != '_' && *c != ',').collect();
-
-    let num: f32 = num_str.parse().map_err(|_| Error::custom("Not a number"))?;
 
     Ok((num, unit_str))
 }
@@ -61,7 +66,7 @@ impl<'de> Deserialize<'de> for units::Mass {
         let (n, unit_str) = deserialize_unit(deserializer)?;
 
         match unit_str {
-            "g" | "gram" | "grams" => Ok(Mass::new::<gram>(n as i32)),
+            "" | "g" | "gram" | "grams" => Ok(Mass::new::<gram>(n as i32)),
             "kg" | "kilogram" | "kilograms" => {
                 let c = Mass::new::<kilogram>(1).get::<gram>() as f32;
                 Ok(Mass::new::<gram>((c * n) as i32))
@@ -82,7 +87,7 @@ impl<'de> Deserialize<'de> for units::ShortTime {
         let (n, unit_str) = deserialize_unit(deserializer)?;
 
         match unit_str {
-            "us" | "microsecond" | "microseconds" => {
+            "" | "us" | "microsecond" | "microseconds" => {
                 Ok(units::ShortTime::new::<units::short_microsecond>(n as i32))
             }
             "ms" | "millisecond" | "milliseconds" => {
@@ -135,7 +140,7 @@ impl<'de> Deserialize<'de> for units::LongTime {
         let (n, unit_str) = deserialize_unit(deserializer)?;
 
         match unit_str {
-            "us" | "µs" | "microsecond" | "microseconds" => {
+            "" | "us" | "µs" | "microsecond" | "microseconds" => {
                 let c = units::LongTime::new::<units::long_microsecond>(1)
                     .get::<units::long_millisecond>() as f32;
                 Ok(units::LongTime::new::<units::long_millisecond>(
@@ -209,7 +214,7 @@ impl<'de> Deserialize<'de> for units::Length {
         let (n, unit_str) = deserialize_unit(deserializer)?;
 
         match unit_str {
-            "htmm" => Ok(units::Length::new::<units::htmm>(n as i32)),
+            "" | "htmm" => Ok(units::Length::new::<units::htmm>(n as i32)),
             "mm" | "millimeter" | "millimeters" => {
                 let c = units::Length::new::<units::millimeter>(1).get::<units::htmm>() as f32;
                 Ok(units::Length::new::<units::htmm>((c * n) as i32))
@@ -249,7 +254,7 @@ impl<'de> Deserialize<'de> for units::Velocity {
         let (n, unit_str) = deserialize_unit(deserializer)?;
 
         match unit_str {
-            "htmm/ms" => Ok(units::Velocity::new::<units::htmm_per_millisecond>(
+            "" | "htmm/ms" => Ok(units::Velocity::new::<units::htmm_per_millisecond>(
                 n as i32,
             )),
             "mm/s" | "millimeter per second" | "millimeters per second" => {
@@ -300,7 +305,7 @@ impl<'de> Deserialize<'de> for units::Acceleration {
         let (n, unit_str) = deserialize_unit(deserializer)?;
 
         match unit_str {
-            "htmm/ms^2" | "htmm/ms²" => Ok(units::Acceleration::new::<
+            "" | "htmm/ms^2" | "htmm/ms²" => Ok(units::Acceleration::new::<
                 units::htmm_per_millisecond_squared,
             >(n as i32)),
             "mm/s^2"

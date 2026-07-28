@@ -5,9 +5,9 @@ max_velocity = "500 mm/s"
 max_accel = "20000 mm/s^2"
 max_z_velocity = "50 mm/s"
 max_z_accel = "1200 mm/s^2"
-x_range=["0 mm","256 mm"]
-y_range=["0 mm","256 mm"]
-z_range=["0 mm","256 mm"]
+x_range=["0","256 mm"]
+y_range=["0","256 mm"]
+z_range=["0","256 mm"]
 square_corner_velocity="9.0 mm/s"
 
 # What MCUs hold what axes

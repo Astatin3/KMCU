@@ -1,6 +1,10 @@
 //! A wrapper for the serial connection
 //! using the protocol for elegoo printers
 //! with the magic byte 0xA55A
+//!
+//! On the Elegoo CC2, the toolhead will sometimes
+//! just not work if it gets stuck in a bad state.
+//! This code is guaranteed to fix it
 
 mod command;
 
@@ -23,14 +27,7 @@ pub struct Elegoo0xA55A {
     stream: Box<dyn Stream>,
 }
 
-// 1. Power pulse (LOW → 200ms → HIGH)
-// 2. Open serial
-// 3. Send bootloader PING  (0xA5 0x5A ...)
-// 4. Receive PONG
-// 5. Send JUMP             (0xA5 0x5A ...)
-// 6. Close serial          (or wait briefly)
-// 7. Open serial again (or reuse)
-// 8. Normal Klipper identify
+// This is from github.com/elegooofficial/CentauriCarbon2/blob/main/elegoo/mcu.cpp
 
 impl Elegoo0xA55A {
     pub fn new(pin: &str, connection: Connection) -> Result<Self, IOError> {
@@ -40,6 +37,7 @@ impl Elegoo0xA55A {
 
         let gpio = GPIO::new(pin, false)?;
 
+        // Set the MCU to bootloader mode by toggling it for 200ms
         gpio.set(false);
         sleep(LongTime::new::<long_millisecond>(200));
         gpio.set(true);
@@ -47,19 +45,22 @@ impl Elegoo0xA55A {
         // Wait for the MCU to boot
         sleep(LongTime::new::<long_millisecond>(50));
 
+        // Start the stream
         let mut stream = init_connection(connection)?;
 
-        const C: u32 = 0x12345678;
+        const N: usize = 5; // times to retry
+        const C: u32 = 0x12345678; // Some data to check for
 
         // Try a few times to ping the MCU
-        let sucsess = for _ in 0..5 {
+        for i in 0..N {
             BootloaderCmd::Ping(C).encode(&mut *stream, &())?;
             match BootloaderCmd::decode(&mut *stream, &()) {
-                Ok(BootloaderCmd::Pong(v)) if v == C => break, // got the packet
-                Err(IOError::Timeout) => continue,             // try again
+                Ok(BootloaderCmd::Pong(C)) => break, // got the packet
+                Err(IOError::Timeout) if i == N - 1 => return Err(IOError::Timeout),
+                Err(IOError::Timeout) => continue, // try again
                 _ => return Err(IOError::UnexpectedCommand),
             }
-        };
+        }
 
         // Jump to OS
         BootloaderCmd::Jump.encode(&mut *stream, &())?;
@@ -70,6 +71,7 @@ impl Elegoo0xA55A {
         // Flush the stream because it probably contains nonsense
         stream.flush_input()?;
 
+        // Everything should be good now
         Ok(Self { gpio, stream })
     }
 }

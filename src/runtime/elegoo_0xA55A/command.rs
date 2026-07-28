@@ -5,22 +5,74 @@ use crate::{
     utils::error::IOError,
 };
 
+/// Commands in the Elegoo 0xA55A bootloader protocol.
+///
+/// Each command is framed as:
+///   `[0xA5, 0x5A] [command_byte] [payload_len_be_u16] [payload] [crc_be_u16]`
+/// where CRC is CRC-16-CCITT (XMODEM) over the payload only.
 #[derive(Debug, Clone)]
 pub enum BootloaderCmd {
+    /// Host → bootloader: check if the bootloader is alive.
+    ///
+    /// Contains a 32-bit magic value (e.g. `0x12345678`). The bootloader
+    /// replies with [`Pong`] echoing the same value. Also resets the
+    /// internal auto-jump timer, keeping the bootloader from jumping to
+    /// the application firmware.
     Ping(u32),
+
+    /// Bootloader → host: response to [`Ping`].
+    ///
+    /// Echoes back the magic value from the `Ping` to confirm the
+    /// bootloader is operational.
     Pong(u32),
+
+    /// Host → bootloader: erase a flash sector.
+    ///
+    /// The payload contains the 32-bit start address of the sector to
+    /// erase. On success the bootloader replies with [`EraseAck`] at the
+    /// same address.
     Erase(u32),
+
+    /// Bootloader → host: acknowledgement of a [`Erase`] command.
+    ///
+    /// Confirms the sector at the given address was erased.
     EraseAck(u32),
+
+    /// Host → bootloader: program a chunk of data into flash.
+    ///
+    /// Fields:
+    /// * `offset` — starting address in flash for this chunk.
+    /// * `length` — total firmware size being programmed (same in every
+    ///   chunk of a multi-chunk transfer).
+    /// * `size`   — number of bytes in this chunk (may be shorter than
+    ///   `data.len()`; padding bytes in `data` should be ignored).
+    /// * `data`   — raw bytes to write (padded to a fixed chunk size
+    ///   by the sender).
+    ///
+    /// On success the bootloader replies with [`ProgramAck`] containing
+    /// the same `length` and `offset`.
     Program {
         offset: u32,
         length: u32,
         size: u32,
         data: Vec<u8>,
     },
+
+    /// Bootloader → host: acknowledgement of a [`Program`] chunk.
+    ///
+    /// Confirms that the chunk at `offset` was written, referencing the
+    /// total `length` from the original program command.
     ProgramAck {
         length: u32,
         offset: u32,
     },
+
+    /// Host → bootloader: jump to the main application firmware.
+    ///
+    /// Fire-and-forget: the bootloader branches to the application entry
+    /// point immediately and *does not send a response*. After sending
+    /// this command the host must wait for the application to boot before
+    /// starting Klipper protocol communication.
     Jump,
 }
 
